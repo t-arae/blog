@@ -21,3 +21,6 @@ options(
 
 # fix Hugo version
 options(blogdown.hugo.version = "0.92.2")
+
+options(blogdown.author = "")
+options(blogdown.ext = ".Rmd")
