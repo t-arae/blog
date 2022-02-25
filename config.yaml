@@ -11,6 +11,9 @@ menu:
     - name: tags
       url: /tags/
       weight: 10
+    - name: home
+      url: /
+      weight: 10
     - name: archive
       url: /archives/
       weight: 10
@@ -23,3 +26,20 @@ outputs:
         - HTML
         - RSS
         - JSON # is necessary
+
+params:
+    profileMode:
+        enabled: true
+        title: TA
+        subtitle: 赤ベコかわいい
+        imageUrl: "/beko.jpeg"
+        imageTitle: my image
+        # imageWidth: 120
+        # imageHeight: 120
+        buttons:
+            - name: posts 
+              url: /post/
+            - name: archives
+              url: /archives/
+            - name: tags
+              url: /tags/
