@@ -11,3 +11,6 @@ menu:
     - name: tags
       url: /tags/
       weight: 10
+    - name: archive
+      url: /archives/
+      weight: 10
