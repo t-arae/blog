@@ -2,3 +2,12 @@ theme: "hugo-PaperMod"
 baseURL: http://example.org/
 languageCode: en-us
 title: めも
+
+menu:
+  main:
+    - name: categories
+      url: /categories/
+      weight: 10
+    - name: tags
+      url: /tags/
+      weight: 10
