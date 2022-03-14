@@ -3,8 +3,8 @@ title: "blogdown事始め"
 author: ''
 date: '2022-02-25'
 slug: []
-categories: ["R"]
-tags: ["blogdown"]
+categories: ["R", "blog"]
+tags: ["blogdown", "Netlify", "Hugo"]
 ---
 
 # ブログを作成する
