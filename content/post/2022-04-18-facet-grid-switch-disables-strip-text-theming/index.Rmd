@@ -1,0 +1,82 @@
+---
+title: facet_grid(switch = "y")を指定するとstripの文字の角度が変更できない
+author: ''
+date: '2022-04-18'
+slug: []
+categories: ["R"]
+tags: ["ggplot2", "tips-ggplot2"]
+---
+
+# TL;DR
+`facet_grid(switch)`でストリップの方向を変えた時は、文字角度を変更する際に`theme()`の引数に注意する。
+
+# 経緯
+
+表題の通り、`ggplot2`パッケージの`facet_grid(switch = "y")`を指定した際に、`theme()`の`strip.text.y = element(angle = 0)`などでstripの文字の見栄えを変更できずにハマった。
+例としては次の様なプロットを作成したときに、
+
+```{r}
+library(ggplot2)
+
+gp1 <-
+  ggplot(iris, aes(Sepal.Length, Sepal.Width)) +
+  geom_point() +
+  facet_grid(rows = vars(Species))
+gp1
+```
+
+種名が書かれたストリップを右側から左側に移動させたいときには、以下の様に`facet_grid(switch = "y")`を指定するとできる。
+
+```{r}
+gp2 <-
+  ggplot(iris, aes(Sepal.Length, Sepal.Width)) +
+  geom_point() +
+  facet_grid(rows = vars(Species), switch = "y")
+gp2
+```
+
+このとき、移動させたストリップの文字の向きを変えたい（例えば文字が水平になる様に回転させたい）とおもって、`theme(strip.text.y = element_text(angle = ~))`を変えても、変更が反映されなかった。
+
+```{r}
+gp2 + theme(strip.text.y = element_text(angle = 0))
+```
+
+# 解決
+以下のリンク先のGithub issueを見つけて解決した。
+
+- https://github.com/tidyverse/ggplot2/issues/4557
+- https://github.com/tidyverse/ggplot2/issues/3888
+
+要は指定する`theme()`の引数が間違っていて、`theme(strip.text.y.left)`を指定しなければいけなかったらしい。
+
+```{r}
+gp2 + theme(strip.text.y.left = element_text(angle = 0))
+```
+
+ハマった原因としては、[公式のReferenceサイト](https://ggplot2.tidyverse.org/reference/theme.html)にもこの引数のことは書かれていない様だし、`theme()`のタブ補完の候補でも出てこなかったので気付かなかった、というのが大きな要因だと思う。
+
+[二つ目のIssue](https://github.com/tidyverse/ggplot2/issues/3888)をみると、`ggplot2=v3.3.2`から導入されたらしい。NEWS.mdに記載されていた[(PR)](https://github.com/tidyverse/ggplot2/pull/3896)。
+
+また、[こちらのIssue](https://github.com/tidyverse/ggplot2/issues/4557)でも示されているが、例えばストリップの文字色は`strip.text.y`で指定しても変更されるらしい。
+
+```{r}
+gp2 + theme(strip.text.y = element_text(angle = 0, color = "red"))
+```
+
+`facet_grid(switch = "x")`で上下のストリップを配置転換をした場合は、`strip.text.x`で方向を変更できるっぽい。
+
+```{r}
+gp3 <-
+  ggplot(iris, aes(Sepal.Length, Sepal.Width)) +
+  geom_point() +
+  facet_grid(cols = vars(Species), switch = "x")
+gp3
+gp3 + theme(strip.text.x = element_text(angle = 15, color = "red"))
+```
+
+# Session information
+
+```{r}
+sessionInfo()
+```
+
