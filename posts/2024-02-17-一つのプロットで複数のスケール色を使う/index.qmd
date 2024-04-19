@@ -1,0 +1,155 @@
+---
+title: "一つのプロットで複数のスケール（色）を使う"
+subtitle: ""
+description: ""
+author: ""
+date: "2024-02-17"
+categories: [color, ggplot2, R]
+---
+
+# 動機
+一つのプロットにおける複数のデータについて、別々のカラースケールを使いたい時。
+
+# Load packages
+```{r}
+library(magrittr)
+library(ggplot2)
+```
+
+# ダメな例
+irisのSepal (萼片) とPetal (花弁) を同じ一つの散布図にそれぞれ分けて作図することを考える。
+どちらもSpeciesで色分けしたいが、SepalとPetalで色分けを変えたい場合どうするか？
+
+以下のように、それぞれの散布図(`geom_point`)の下に、
+そのままそれぞれの色を指定する(`scale_color_viridis_d`)と、
+古い色の指定は新しいカラースケールに上書きされて、
+Sepal、Petal両方に同じカラースケールが適用される。
+
+```{r}
+#| code-fold: true
+theme_scatter <- function() {
+  list(
+    theme_void(base_size = 14),
+    theme(
+      panel.background = element_rect(fill = "grey80")
+    )
+  )
+}
+```
+
+```{r}
+(gp1 <-
+   iris %>%
+   ggplot(aes(Sepal.Length, Sepal.Width)) +
+   geom_point(aes(color = Species), size = 2) +
+   scale_color_viridis_d(option = "A", begin = .1, end = .5) +
+   geom_point(
+     aes(Petal.Length, Petal.Width, color = Species),
+     shape = 2, size = 2
+   ) +
+   scale_color_viridis_d(option = "D", begin = .1, end = .5) +
+   theme_scatter())
+```
+
+# `ggnewscale`パッケージを使う
+
+`ggnewscale::new_scale_color()`を各スケールの間に挟むと、別の`scale_color_*()`が利用できる。
+
+```{r}
+(gp2 <-
+   iris %>%
+   ggplot(aes(Sepal.Length, Sepal.Width)) +
+   geom_point(aes(color = Species), size = 2) +
+   scale_color_viridis_d(option = "A", begin = .1, end = .5) +
+   ggnewscale::new_scale_color() +
+   geom_point(
+     aes(Petal.Length, Petal.Width, color = Species),
+     shape = 2, size = 2
+   ) +
+   scale_color_viridis_d(option = "D", begin = .1, end = .5) +
+   theme_scatter())
+```
+
+# 凡例を分ける
+
+凡例を別々にコントロールしたい時は、`scale_color_*()`の`guide`引数に`guide_*()`を渡す。
+
+```{r}
+(gp3 <-
+   iris %>%
+   ggplot(aes(Sepal.Length, Sepal.Width)) +
+   geom_point(aes(color = Species), size = 2) +
+   scale_color_viridis_d(option = "A", begin = .1, end = .5) +
+   ggnewscale::new_scale_color() +
+   geom_point(
+     aes(Petal.Length, Petal.Width, color = Species),
+     shape = 2, size = 2
+   ) +
+   scale_color_viridis_d(option = "D", begin = .1, end = .5,
+                         guide = guide_legend(title = "new")) +
+   theme_scatter())
+```
+
+# facetでも分けて、色も分ける場合
+
+描画するデータを`dplyr::filter()`で分けて、複数回プロットすればよい。
+
+```{r}
+tbl_plot <-
+  iris %>%
+  tibble::as_tibble() %>%
+  dplyr::mutate(rn = dplyr::row_number()) %>%
+  tidyr::pivot_longer(cols = !c(Species, rn)) %>%
+  dplyr::mutate(
+    part = stringr::str_extract(name, "^[^.]+"),
+    measure = stringr::str_extract(name, "[^.]+$"),
+  ) %>%
+  dplyr::select(!name) %>%
+  tidyr::pivot_wider(names_from = measure, values_from = value)
+tbl_plot
+
+tbl_plot %>%
+  ggplot(aes(Length, Width, shape = part)) +
+  geom_point(data = \(df) dplyr::filter(df, part == "Petal"), aes(color = Species)) +
+  ggnewscale::new_scale_color() +
+  geom_point(data = \(df) dplyr::filter(df, part == "Sepal"), aes(color = Species)) +
+  scale_color_viridis_d(option = "B", guide = guide_legend(title = "Species for Sepal")) +
+  facet_wrap(~ part, scales = "free") +
+  theme_scatter()
+```
+
+# `ggnewscale::new_scale_color()`は何回も使える
+
+```{r}
+plot_facet <- function(temp_facet, temp_option) {
+  list(
+    geom_point(data = \(df) dplyr::filter(df, facet == temp_facet), aes(color = Species)),
+    scale_color_viridis_d(begin = .1, end = .9, option = temp_option, guide = guide_legend(title = temp_option))
+  )
+}
+
+purrr::map(1:6, ~ dplyr::mutate(dplyr::slice_head(iris, n = 10, by = Species), facet = .x)) %>%
+  dplyr::bind_rows() %>%
+  ggplot(aes(Sepal.Length, Sepal.Width)) +
+  plot_facet(1, "A") +
+  ggnewscale::new_scale_colour() +
+  plot_facet(2, "B") +
+  ggnewscale::new_scale_colour() +
+  plot_facet(3, "C") +
+  ggnewscale::new_scale_colour() +
+  plot_facet(4, "D") +
+  ggnewscale::new_scale_colour() +
+  plot_facet(5, "E") +
+  ggnewscale::new_scale_colour() +
+  plot_facet(6, "F") +
+  facet_wrap(~ facet) +
+  theme_scatter() +
+  theme(legend.direction = "horizontal",
+        legend.margin = margin(),
+        legend.spacing.y = unit(2, "mm"))
+```
+
+# Session info
+```{r}
+sessionInfo()
+```

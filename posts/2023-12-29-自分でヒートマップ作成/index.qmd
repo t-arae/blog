@@ -1,0 +1,486 @@
+---
+title: "自分でヒートマップ作成"
+subtitle: ""
+description: ""
+author: ""
+date: "2023-12-29"
+categories: [ggplot2, heatmap, R]
+---
+
+# はじめに
+Rでヒートマップを作成するには、専用の関数やパッケージを使えばできる。
+
+```{r}
+# 一番簡単？な方法は`stats::heatmap()`を使う。
+# パッケージをインストールする必要もない。
+stats::heatmap(as.matrix(mtcars))
+```
+
+他のヒートマップ作成用のパッケージもある。
+
+* `pheatmap`
+* `ComplexHeatmap`
+
+これらの関数を使用する代わりに、
+`ggplot2`の扱いに慣れていればヒートマップを`ggplot2`でも描くことができる。
+`ggplot2`でヒートマップを描く利点は、
+他のパッケージや関数の使用方法を新たに勉強する必要がないこと、
+そして自分でプロットを細かくコントロールすることができることにある。
+ここでは、`ggplot2`を使ってヒートマップを描く方法について、
+いくつかのテクニックと共に紹介する。
+
+# Load packages
+```{r}
+library(magrittr)
+library(ggplot2)
+```
+
+# ヒートマップ作成の基本
+まずはヒートマップを作成したいデータを`data.frame`にする必要がある。
+多くの場合、x軸あるいはy軸に遺伝子やサンプル、処理条件などを配置し、
+各セルの色を何らかの値（遺伝子発現量など）にするだろう。
+
+ここでは横軸をサンプル、縦軸を遺伝子、
+セルの色を遺伝子の各サンプルにおける遺伝子の発現量としたヒートマップを描くことにする。
+
+## 遺伝子発現データの準備
+デモシナリオとして、何らかの処理区と非処理区のサンプルについて、
+RNA-seqを行ない、得られたリードカウントデータを元にヒートマップを描くことを考える。
+簡易的なシミュレーションで、擬似リードカウントデータを生成して、
+プロット作成に使う。
+何度かパターンを変えてヒートマップを作成したいので、簡単にデータが生成できるように、
+データ生成用の関数を作っておき、それを利用する。
+
+```{r}
+# 遺伝子発現量のdata.frameの元を準備
+
+make_tbl_exp_table <- function(n_gene = 1000, n_rep = 3) {
+  if(n_gene < 1) stop("n_gene should be more than 1.")
+  DIGIT <- floor(log10(n_gene)) + 1L
+  
+  if(n_rep < 1) stop("n_rep should be more than 1.")
+  
+  tbl_plot <-
+    tidyr::crossing(
+      gene = sprintf(paste0("gene%0", DIGIT, "d"), seq_len(n_gene)),
+      condition = c("control", "treat"),
+      rep = seq_len(n_rep)
+    ) %>%
+    dplyr::mutate(exp = NA) %>%
+    tidyr::pivot_wider(names_from = c(condition, rep), values_from = exp)
+  tbl_plot
+}
+make_tbl_exp_table()
+
+# 基本の発現量を設定
+mutate_base_exp <- function(tbl, seed = 777) {
+  set.seed(seed)
+  tbl %>%
+    dplyr::mutate(base = rnbinom(n = nrow(tbl), mu = 100, size = 1) + 1L,
+                  .before = 2)
+}
+
+# 処理による発現変動（log2FC）を設定
+mutate_log2fc <- function(tbl, seed = 777) {
+  set.seed(seed)
+  tbl %>%
+    dplyr::mutate(log2fc = rnorm(n = nrow(tbl), sd = 2), .after = base)
+}
+
+# 基本の発現量と発現変動量をもとに、各遺伝子の各サンプルにおける発現量を計算
+assign_expression <- function(tbl, seed = 777) {
+  set.seed(seed)
+  tbl %>%
+    dplyr::mutate(dplyr::across(dplyr::starts_with("control"), \(x) {
+      purrr::map2_int(x, base, ~ rnbinom(n = 1, mu = .y, size = 1/.2))
+    })) %>%
+    dplyr::mutate(dplyr::across(dplyr::starts_with("treat"), \(x) {
+      purrr::map2_int(x, (2^log2fc)*base, ~ rnbinom(n = 1, mu = .y, size = 1/.2))
+    }))
+}
+
+# 関数を元に発現量のdata.frameを作成
+tbl_exp <-
+  make_tbl_exp_table(n_gene = 200, n_rep = 5) %>%
+  mutate_base_exp() %>%
+  mutate_log2fc() %>%
+  assign_expression()
+tbl_exp
+```
+
+## 最低限のヒートマップ作成
+ここまで準備できたら、最低限の設定をしたヒートマップを作成していく。
+基本的なコンセプトは非常に単純、
+
+1. 必要があれば`ggplot2`で扱いやすいように`data.frame`を変形、変数（列）を追加
+2. タイル（`geom_tile`）を選択して、横軸にサンプル、縦軸に遺伝子、色に発現量を指定する。
+
+たったこれだけである。
+ここでは、`tidyr::pivot_longer()`でdata.frameを変形して、
+`ggplot()`でx軸にサンプルの列、y軸に遺伝子IDの列を指定し、
+`geom_tile()`でセルの色に発現量の列を指定していく。
+
+```{r}
+#| fig-height: 4
+gp <-
+  tbl_exp %>%
+  tidyr::pivot_longer(
+    cols = !c(gene, base, log2fc),
+    names_to = "sample",
+    values_to = "readcount"
+  ) %>%
+  ggplot(aes(x = sample, y = gene)) +
+  geom_tile(aes(fill = readcount + 1))
+gp
+```
+
+あとは、必要に応じてヒートマップの体裁を整えていく。
+
+```{r}
+#| fig-height: 4
+## 横軸のタイトルを消去
+(gp <- gp + labs(x = ""))
+## 発現量がリードカウントなので、log変換して色分け
+(gp <- gp + scale_fill_continuous(trans = "log10"))
+## ヒートマップの色を変更
+(gp <- gp + scale_fill_gradient(trans = "log10", low = "grey90", high = "red"))
+## ヒートマップの余白＆縦軸のラベル削除
+gp +
+  scale_x_discrete(expand = expansion(0)) +
+  scale_y_discrete(expand = expansion(0)) +
+  theme(
+    axis.ticks.y = element_blank(),
+    axis.text.y = element_blank()
+  )
+```
+
+# (さらに)ヒートマップの体裁を整える
+`ggplot2`でヒートマップを作成すれば、その体裁の整え方は`ggplot2`のやり方になる。
+先ほどと同様のデータに少し手を加えて、さらに体裁を整えてみる。
+
+## 変動パターンを強調する
+先ほどまでは色分けにリードカウントデータを使っていたが、
+これだと発現が低い遺伝子ではパターンの変化が見分けにくい。
+そこで、遺伝子のサンプル間における発現量の変化に注目するために、
+リードカウントをRPM補正して対数変換し、
+遺伝子ごとに正規化（Z変換）してヒートマップを描く。
+また、サンプルの条件（対照区か処理区か）でヒートマップを区切ってみやすくする。
+
+このような変更を`ggplot2`だけで行うのは大変なので、
+作図用のデータに手を加える（新たに列を加える）ことで対応する。
+
+```{r}
+# データの修正
+tbl_plot <-
+  tbl_exp %>%
+  # readcountをRPM補正する
+  purrr::modify_if(is.integer, ~ 1e6 * .x / sum(.x)) %>%
+  tidyr::pivot_longer(
+    cols = !c(gene, base, log2fc),
+    names_to = "sample",
+    values_to = "RPM"
+  ) %>%
+  # サンプル条件の列とリピートの列を加える
+  dplyr::mutate(
+    condition =
+      stringr::str_extract(sample, "control|treat") %>%
+      stringr::str_to_title(),
+    rep = paste("Rep.", stringr::str_extract(sample, "[12345]"))
+  ) %>%
+  # 遺伝子ごとに対数変換したRPMのZ-scoreを計算する。
+  dplyr::mutate(Zscore = scale(log(RPM + 1))[,1], .by = gene)
+tbl_plot
+```
+
+```{r}
+#| fig-height: 4
+# 修正したデータを使ってヒートマップを作図
+plot_heatmap <- function(tbl) {
+  tbl %>%
+    ggplot(aes(x = rep, y = gene)) +
+    geom_tile(aes(fill = Zscore)) +
+    # ここは基本編とおなじ
+    labs(x = "", y = "") +
+    scale_x_discrete(expand = expansion(0)) +
+    scale_y_discrete(expand = expansion(0)) +
+    # 以下は変更
+    scale_fill_gradient2() +
+    facet_grid(cols = vars(condition)) +
+    theme_linedraw(base_size = 12) +
+    theme(
+      axis.ticks = element_blank(),
+      axis.text.y = element_blank(),
+      panel.border = element_rect(color = "black", fill = NA),
+      strip.text = element_text(color = "black", face = "bold"),
+      strip.background = element_rect(color = "black", fill = NA)
+    ) +
+    guides(fill = guide_colorbar(
+      title.theme = element_text(angle = 270),
+      title = "Z-score transformed RPM",
+      title.position = "right",
+      label.position = "left",
+      barheight = unit(5, "cm"),
+      barwidth = unit(.3, "cm")
+    ))
+}
+tbl_plot %>% plot_heatmap()
+```
+
+## ヒートマップの並べ替え
+また、遺伝子の順番を何らかの基準で並べ替えることもできる。
+
+`ggplot2`では離散変数（文字列、`character`型）の並びは明示的に決めていない場合、
+辞書順で因子型（`factor`型）に変換される。
+つまり何も指定しなければ辞書順になる。
+そこで、順番を変えたい`character`型の変数（列）を`factor`型に変更し、
+明示的に順番を指定すれば良い。
+こうした作業には`forcats`パッケージの関数が便利である。
+
+まずは、簡単に発現変動量の値を元に並べ替えをしてみる。
+
+```{r}
+#| fig-height: 4
+gene_order <- dplyr::arrange(tbl_exp, log2fc)$gene
+tbl_plot %>%
+  dplyr::mutate(gene = forcats::fct_relevel(gene, gene_order)) %>%
+  plot_heatmap()
+```
+
+## 階層型クラスタリングによる並べ替え
+次に、発現パターンを元にクラスタリングを行って、その結果を使って並べ替える。
+まずは階層型クラスタリングを行なってみる。
+階層型クラスタリングは各要素間の距離をもとに、
+アルゴリズムを用いて最も近い要素同士を
+一つのクラスタにまとめる作業を繰り返すことで達成される。
+`R`にはデフォルトで階層型クラスタリングを行う`hclust()`関数があるのでこれを使うことができる。
+
+`hclust()`でクラスタリングを行うためには、遺伝子間の発現パターンを元に距離を計算して、距離行列を作成する必要がある。
+遺伝子の発現パターンを比較するには相関係数が良いと思うが、
+`R`の元々ある距離行列を求める`dist()`関数ではこれは計算することができない。
+そこで、`amap`パッケージの`amap::Dist()`関数を用いる。
+
+```{r}
+#| fig-height: 4
+# 階層型クラスタリング用のdata.frameの準備
+df_data <-
+  tbl_plot %>%
+  dplyr::select(gene, sample, Zscore) %>%
+  tidyr::pivot_wider(names_from = sample, values_from = Zscore) %>%
+  tibble::column_to_rownames("gene")
+head(df_data)
+
+# 距離として相関係数、アルゴリズムはWard法を使って階層型クラスタリング
+hc <-
+  df_data %>%
+  amap::Dist(method = "correlation") %>%
+  hclust(method = "ward.D2")
+
+# クラスタリングした順序を用いてヒートマップを並べ替え
+gene_order <- hc$labels[hc$order]
+tbl_plot %>%
+  dplyr::mutate(gene = forcats::fct_relevel(gene, gene_order)) %>%
+  plot_heatmap()
+```
+
+階層型クラスタリングでは、特定のクラスタ数になるように木をある高さで切ることで、
+各遺伝子をそれぞれのクラスタに分けることができる。
+この操作は`cutree()`関数で行うことができる。
+`cutree()`でクラスタに分割して、
+その情報をもとにクラスタで分けられたヒートマップを作成してみる。
+
+```{r}
+#| fig-height: 4
+cut_into_cluster <- hc %>% cutree(3)
+
+tbl_plot %>%
+  dplyr::mutate(cluster = cut_into_cluster[gene]) %>%
+  dplyr::arrange(cluster) %>%
+  dplyr::mutate(gene = forcats::fct_inorder(gene)) %>%
+  plot_heatmap() +
+  facet_grid(rows = vars(cluster), cols = vars(condition),
+             scales = "free", space = "free") +
+  theme(panel.spacing = unit(.5, "mm"))
+```
+
+## K-meanクラスタリングによる並べ替え
+よく使われる非階層型クラスタリングとして、K-mean法によるクラスタリングがある。
+`R`では`kmeans()`関数で簡単にクラスタリングできるので、
+これを使ってヒートマップをクラスタごとに分割してみる。
+また、`kmeans()`で得られたクラスタの順序はお互いに関連がないので、
+各クラスタの中心を元に階層型クラスタリングを行い、
+クラスタの並び替えを行う。
+
+```{r}
+#| fig-height: 4
+set.seed(777)
+res_kmean <-
+  df_data %>%
+  kmeans(centers = 8)
+
+hc <- hclust(amap::Dist(res_kmean$centers, method = "correlation"))
+
+tbl_plot_w_km_cluster <-
+  tbl_plot %>%
+  dplyr::mutate(
+    cluster =
+      res_kmean$cluster[gene] %>%
+      as.character() %>%
+      forcats::fct_relevel(hc$labels[hc$order])
+  ) %>%
+  dplyr::arrange(cluster) %>%
+  dplyr::mutate(gene = forcats::fct_inorder(gene))
+
+tbl_plot_w_km_cluster %>%
+  plot_heatmap() +
+  facet_grid(rows = vars(cluster), cols = vars(condition),
+             scales = "free", space = "free") +
+  theme(panel.spacing = unit(.5, "mm"))
+```
+
+# ヒートマップをさらに改造
+ここまでは階層型クラスタリングに用いた`amap`パッケージを除いて、
+`R`をインストールした際に最初からインストールされているパッケージや、
+`tidyverse`のパッケージ群を用いてヒートマップの作図を行なってきた。
+
+これらのパッケージに加えて、
+`ggplot2`の機能をさらに拡張することができるパッケージが多く開発されている。
+ここからは、そうした追加のパッケージを用いて、
+さらに凝った体裁のヒートマップを作図する方法を紹介する。
+
+## ネストされたfacet
+`ggh4x`パッケージを使うと、ネストされたfacetを設定することができる。
+これまではリピートをx軸に設定していたが、
+"処理条件の中の各反復"という入れ子（ネスト）を、facetとして表現することができる。
+今回の例ではそれほどネストさせる意味はないが、
+たとえば異なる処理をしたサンプルを経時的に計測したデータなどでは、
+ネストされたfacetでヒートマップを作成するとみやすいかもしれない。
+
+```{r}
+#| fig-height: 6
+#| fig-width: 14
+gp_hm <-
+  tbl_plot_w_km_cluster %>%
+  plot_heatmap() +
+  facet_grid(rows = vars(cluster), cols = vars(condition),
+             scales = "free", space = "free", switch = "y") +
+  theme(
+    strip.text = element_text(color = "black", face = "bold"),
+    strip.text.y.left = element_text(color = "black", face = "bold", angle = 90),
+    strip.background = element_rect(color = NA, fill = NA),
+    panel.border = element_rect(color = NA, fill = NA),
+    panel.spacing.x = unit(1.5, "mm"),
+    panel.spacing.y = unit(1.5, "mm")
+  )
+
+gp_hm_nested <-
+  gp_hm +
+  ggh4x::facet_nested(cols = vars(condition, rep), rows = vars(cluster),
+                      scales = "free", space = "free", nest_line = element_line(), switch = "y") +
+  theme(
+    axis.text = element_blank(),
+    ggh4x.facet.nestline = element_line(colour = "black", linewidth = 1)
+  )
+
+patchwork::wrap_plots(gp_hm, gp_hm_nested, nrow = 1)
+```
+
+## 樹形図の追加
+`ggdendro`パッケージを用いると、階層型クラスタリングを行なったオブジェクトから、
+`ggplot2`で樹形図を描くためのデータを抽出することができる。
+これはつまり、`ggplot2`で樹形図の体裁を整えることができるということである。
+
+また、`ggplot2`で作成した複数のプロットを一つにまとめるパッケージはいくつかあるので、
+そういったものを使えば、ヒートマップの並べ替えの根拠として階層型クラスタリングの
+樹形図を組み合わせることができる。
+ここでは、`ggdendro`パッケージと`patchwork`パッケージを用いて、
+ヒートマップとk-meanで求めた各クラスタの樹形図を組み合わせる方法を紹介する。
+
+ちなみに、共通する軸を持つ複数のプロットを組み合わせる場合は、
+各プロットで対応する軸の位置合わせをする必要がある。
+うまく位置が合わない場合は、プロットの描画範囲や余白を調整するとよい。
+
+```{r}
+cluster_x_pos <-
+  res_kmean$cluster %>%
+  table() %>%
+  {.[hc$labels[hc$order]]} %>%
+  {cumsum(.) - (. / 2)}
+
+dend_data <- ggdendro::dendro_data(hc)
+
+# 葉に繋がる横線
+tbl_leaf <-
+  ggdendro::segment(dend_data) %>%
+  dplyr::filter(x == xend, yend == 0) %>%
+  dplyr::select(x, xend) %>%
+  dplyr::mutate(new_x = as.double(cluster_x_pos))
+
+# ノード間の横線
+tbl_temp <-
+  ggdendro::segment(dend_data) %>%
+  dplyr::filter(x == xend, yend != 0) %>%
+  dplyr::arrange(y) %>%
+  dplyr::select(x, xend)
+
+tbl_temp <-
+  ggdendro::segment(dend_data) %>%
+  dplyr::filter(y == yend) %>%
+  dplyr::arrange(desc(y)) %>%
+  dplyr::slice_head(n = 2) %>%
+  dplyr::select(x, xend) %>%
+  unlist() %>%
+  unique() %>%
+  sort() %>%
+  {.[2]} %>% 
+  {tibble::tibble(x = ., xend = .)} %>%
+  {dplyr::bind_rows(tbl_temp, .)}
+
+for(i in seq_len(nrow(tbl_temp))) {
+  temp <-
+    abs(seq_len(nrow(tbl_leaf)) - tbl_temp[i, 1]) %>%
+    {which(. == min(.))} %>%
+    {mean(tbl_leaf$new_x[.])} %>%
+    {dplyr::mutate(tbl_temp[i, ], new_x = .)}
+  tbl_leaf <- dplyr::bind_rows(tbl_leaf, temp)
+}
+```
+
+```{r}
+#| fig-height: 4
+gp_tree <-
+  ggplot() +
+  geom_segment(
+    data = 
+      ggdendro::segment(dend_data) %>%
+      dplyr::left_join(dplyr::select(tbl_leaf, !xend), by = "x") %>%
+      dplyr::rename(nx = new_x) %>%
+      dplyr::left_join(dplyr::select(tbl_leaf, !x), by = "xend") %>%
+      dplyr::rename(nxend = new_x),
+    aes(x = y, y = nx, xend = yend, yend = nxend)) +
+  scale_x_reverse() +
+  scale_y_reverse(limits = c(200, 0), expand = expansion(add = .5)) +
+  theme_minimal()
+
+patchwork::wrap_plots(
+  gp_tree +
+    labs(y = "K-means cluster") +
+    theme(
+      axis.text = element_blank(),
+      panel.grid = element_blank(),
+      axis.title.x= element_blank(),
+      axis.title.y.left = element_text(face = "bold"),
+      plot.margin = margin()
+    ),
+  gp_hm_nested +
+    theme(
+      axis.title = element_blank(),
+      plot.margin = margin()
+      ),
+  nrow = 1, widths = c(.05, .95)
+  )
+```
+
+# Session info
+```{r}
+sessionInfo()
+```

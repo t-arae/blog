@@ -1,0 +1,72 @@
+---
+title: "複数のFASTQファイルをひとつのファイルにまとめる"
+subtitle: ""
+description: ""
+author: ""
+date: "2023-08-31"
+categories: [awk, FASTQ, Shell]
+date-modified: "2023-08-31"
+---
+
+# TL;DR
+`cat`コマンドではなく、`awk 1`コマンドを使う。
+
+# `cat`コマンドで連結した場合の問題点
+複数のFASTQファイルを一つのFASTQファイルにまとめる時に、よく使われるコマンドは`cat`コマンドだと思う。
+例えば以下のようにして結合する。
+
+```{{bash}}
+echo -n -e "@seq1\\nATGC\\n+\\n;;;;\\n" > temp1.fastq #末尾改行あり
+echo -n -e "@seq2\\nATGC\\n+\\n;;;;" > temp2.fastq.   #末尾改行なし
+cat temp1.fastq temp2.fastq
+
+#> @seq1
+#> ATGC
+#> +
+#> ;;;;
+#> @seq2
+#> ATGC
+#> +
+#> ;;;;
+```
+
+しかし、これは改行文字が適切に入っていないと連結部分がおかしくなる。
+手作業でFASTQファイルを出力・修正した場合、ファイル末尾に改行が入っていない場合がある。
+
+```{{bash}}
+cat temp2.fastq temp1.fastq
+
+#> @seq2
+#> ATGC
+#> +
+#> ;;;;@seq1
+#> ATGC
+#> +
+#> ;;;;
+#> 
+```
+
+# `awk 1`で連結する
+`awk 1`コマンドで連結すると上記の問題を回避できる(`1`はアクション省略、つまり全行で`print`を実行）。
+
+```{{bash}}
+awk 1 temp2.fastq temp1.fastq
+
+#> @seq2
+#> ATGC
+#> +
+#> ;;;;
+#> @seq1
+#> ATGC
+#> +
+#> ;;;;
+#> 
+```
+
+# フォルダ内の全てのFASTQファイルを連結
+
+```{{bash}}
+find . -name *.fastq > list_fastq_files.txt
+cat list_fastq_files.txt | xargs -L1 -I{} awk 1 {} >> temp.fastq
+```
+

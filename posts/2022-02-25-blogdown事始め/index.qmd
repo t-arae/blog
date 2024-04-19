@@ -1,0 +1,56 @@
+---
+title: "blogdown事始め"
+subtitle: ""
+description: ""
+author: ""
+date: "2022-02-25"
+categories: [R, blogdown]
+date-modified: "2022-02-25"
+---
+
+# ブログを作成する
+
+`blogdown`パッケージを使ってブログを作成してみる。 [こちら](https://bookdown.org/yihui/blogdown/get-started.html)を参考にして作成した。 まずは以下のコマンドを実行して、`blogdown`パッケージをインストールした。 インストール時に`hugo`も自動でインストールされる。
+
+```{r, eval=FALSE}
+install.packages("blogdown")
+```
+
+上のリンク先の「1.2.2 Create Project」の内容を実行。 テーマは [hugo-PaperMod](https://github.com/adityatelange/hugo-PaperMod)に変更した。
+
+`blogdown`のデフォルトの設定を変更するために、`.Rprofile`に以下の二行を追加した。
+
+```{r, eval=FALSE}
+options(blogdown.author = "")
+options(blogdown.ext = ".Rmd")
+```
+
+あとは、以下のコマンドを実行して記事を作成していく。
+
+```{r, eval=FALSE}
+# 記事作成
+blogdown::new_post("blogdown_kotohajime")
+
+# 作成した記事をプレビュー。
+# 変更して保存するたびにレンダリングされるので、終わったらサーバーを止める。
+blogdown::serve_site()
+blogdown::stop_server()
+
+# 確認して問題なかったらサイトをビルドする
+blogdown::build_site()
+```
+
+# Netlifyで公開
+
+ビルドされたサイトとしては、`public/`以下のファイルがあれば良いのでホストしてくれるサービスで公開する。 [Netlify](https://www.netlify.com)でアカウントを登録して公開することにした。 GitHubアカウントと連携してアカウント登録を行い、`public/`フォルダをドラッグアンドドロップでアップロードした。
+
+Netlifyで公開するにあたって、`config.yaml`内の`baseURL`がデフォルトで<http://example.org/>で、うまくリンクが働かないのでコメントアウトした。
+
+# オプション等の設定
+
+以下を参考にして、サイトをカスタマイズした。
+
+-   [メニュー追加](https://github.com/adityatelange/hugo-PaperMod/wiki/FAQs#add-menu-to-site)
+-   [アーカイブ追加](https://github.com/adityatelange/hugo-PaperMod/wiki/Features#archives-layout)
+-   [プロフィール追加](https://github.com/adityatelange/hugo-PaperMod/wiki/Features#profile-mode)
+-   [検索追加](https://github.com/adityatelange/hugo-PaperMod/wiki/Features#search-page)

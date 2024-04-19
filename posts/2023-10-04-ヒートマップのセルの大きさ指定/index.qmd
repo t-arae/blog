@@ -1,0 +1,99 @@
+---
+title: "セル数が異なる複数のヒートマップのセルの大きさを揃える"
+subtitle: ""
+description: ""
+author: ""
+date: "2023-10-04"
+categories: [ggplot2, grid, gtable, R, heatmap]
+date-modified: "2023-10-04"
+---
+
+# 動機
+縦横の要素数が異なる複数のヒートマップを`ggplot2`を用いて作成した場合、
+セルの大きさをヒートマップ間で揃えるためにはどうしたらいいか知りたかった。
+
+# Load packages
+```{r}
+library(magrittr)
+library(ggplot2)
+```
+
+# ヒートマップ作成
+```{r}
+make_heatmap <- function(n) {
+  set.seed(n)
+  tbl_plot <-
+    tibble::tibble(
+      y = as.character(seq_len(n)),
+      V1 = rnorm(n),
+      V2 = rnorm(n),
+      V3 = rnorm(n),
+      V4 = rnorm(n),
+      V5 = rnorm(n)
+    ) %>%
+    tidyr::pivot_longer(cols = !y, names_to = "x")
+  gp <-
+    ggplot(tbl_plot, aes(x, y)) +
+    geom_tile(aes(fill = value)) +
+    scale_x_discrete(expand = expansion(0)) +
+    scale_y_discrete(expand = expansion(0)) +
+    scale_fill_gradient2()
+}
+gp1 <-  make_heatmap(5)
+gp2 <-  make_heatmap(10)
+
+# 普通に作成したヒートマップはセルの大きさが揃えられない。
+patchwork::wrap_plots(gp1, gp2)
+```
+
+# プロットの調整
+```{r}
+# プロットの各要素の大きさを細かく指定するためにw、gtableオブジェクトに変換する。
+gt1 <- ggplotGrob(gp1)
+gt2 <- ggplotGrob(gp2)
+
+# gtableオブジェクトのレイアウトを確認する。真ん中 (7, 5)のgrobのサイズが1nullとなっている。
+# この部分のサイズを指定してやれば、ヒートマップのセルの大きさを揃えられる。
+gtable::gtable_show_layout(gt1)
+gt1$heights
+
+# 縦横を指定する。各セルの高さを5 mm、幅を10 mmとして計算して指定する。
+gt1$heights[7] <- ggplot2::unit(5*5, units = "mm")
+gt2$heights[7] <- ggplot2::unit(5*10, units = "mm")
+gt1$widths[5] <- ggplot2::unit(10*5, units = "mm")
+gt2$widths[5] <- ggplot2::unit(10*5, units = "mm")
+
+# セルの大きさが揃うかを確認
+patchwork::wrap_plots(gt1, gt2) # あるいは gridExtra::grid.arrange(gt1, gt2, ncol = 2)
+```
+
+# ファイル出力時に注意すること
+```{r}
+# ファイルに出力する際には自動でサイズ調整はされないので、プロット全体のサイズを指定する。
+# gtableの縦横の合計をmmで計算する関数を定義
+calc_mm <- function(x) sum(grid::convertUnit(x, "mm"))
+
+# ファイル出力
+outf1 <- tempfile(fileext = ".png")
+ggsave(outf1, gt1, width = calc_mm(gt1$widths), height = calc_mm(gt1$heights), units = "mm")
+outf2 <- tempfile(fileext = ".png")
+ggsave(outf2, gt2, width = calc_mm(gt2$widths), height = calc_mm(gt2$heights), units = "mm")
+
+# 出力したファイルを読み込んで意図通りになっているかチェック
+# 小さい方のレジェンドが見切れてはいるが、左右のヒートマップでセルの大きさは揃っている。
+im1 <- magick::image_read(outf1)
+im2 <- magick::image_read(outf2)
+magick::image_append(c(im1, im2))
+```
+
+# 参考
+
+* [ggplot2で縦に並べたグラフの横幅を揃える](https://rion778.hatenablog.com/entry/2015/06/03/011256)
+* [ggplot2、grid、gtable、gridExtraの関係とか](https://notchained.hatenablog.com/entry/2015/12/17/010904)
+* [ggplot2 book - Tabular grid](https://ggplot2-book.org/ext-springs#sec-tabular-grid)
+
+# Session info
+```{r}
+sessionInfo()
+```
+

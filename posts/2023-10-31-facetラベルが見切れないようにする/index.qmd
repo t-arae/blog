@@ -1,0 +1,50 @@
+---
+title: "facetラベルが見切れないようにする"
+subtitle: ""
+description: ""
+author: ""
+date: "2023-10-31"
+categories: [facet, ggplot2, R]
+---
+
+# 動機
+タイトル通りfacetのラベルが見切れないようにする。
+
+# Load packages
+```{r}
+library(magrittr)
+library(ggplot2)
+```
+
+# プロット作成
+```{r}
+tbl_plot <-
+  tibble::tibble(
+    facet = purrr::map_chr(1:6, ~ paste(rep("long label", .x), collapse = ", "))
+  )
+
+gp <-
+  tbl_plot %>%
+  ggplot() +
+  facet_wrap(~ facet) +
+  theme(strip.text = element_text(angle = 10))
+```
+
+# チェック
+```{r}
+# facetのラベルが長くなるとクリップされて見切れる
+gp
+
+# `theme(strip.clip = "off")`を指定するとクリップされない
+gp + theme(strip.clip = "off")
+```
+
+# 参考
+
+* [Turn off clipping of facet labels -- stackoverflow](https://stackoverflow.com/questions/66101250/turn-off-clipping-of-facet-labels)
+
+# Session info
+```{r}
+sessionInfo()
+```
+

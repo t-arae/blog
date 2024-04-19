@@ -1,0 +1,12 @@
+---
+title: "About"
+image: beko.jpeg
+about:
+  template: jolla
+  links:
+    - icon: github
+      text: Github
+      href: https://github.com/t-arae/
+---
+
+赤べこかわいい

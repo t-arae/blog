@@ -5,6 +5,7 @@
 .DS_Store
 
 .hugo_build.lock
-public/*
-*.html
-*.js
+
+_freeze/
+_site/
+/.quarto/

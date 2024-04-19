@@ -1,0 +1,14 @@
+---
+title: "Quartoでブログ作成"
+subtitle: ""
+description: ""
+author: ""
+date: "2023-09-26"
+categories: [Quarto, R]
+date-modified: "2023-09-26"
+---
+
+ブログの生成を`blogdown`から`Quarto`に変えた。
+
+ブログポストの作成は`quartopost::quartopost()`で行うことができる。
+
