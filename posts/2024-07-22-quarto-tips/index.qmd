@@ -1,0 +1,96 @@
+---
+title: "QuartoのTips"
+subtitle: ""
+description: ""
+author: ""
+date: "2024-07-22"
+categories: [Quarto]
+---
+
+Quartoでドキュメントを書く際に使えるテクニックの備忘録。
+
+# 使用しているQuartoのバージョン
+
+```{r}
+quarto::quarto_version()
+```
+
+# Chunkの出力を2カラムで
+
+chunk optionで`layout-nrow`あるいは`layout-ncol`を修正する。
+
+```{r}
+#| echo: fenced
+#| layout-ncol: 2
+plot(iris$Sepal.Length, iris$Sepal.Width)
+plot(iris$Petal.Length, iris$Petal.Width)
+```
+
+```{r}
+#| echo: fenced
+#| layout-nrow: 1
+plot(iris$Sepal.Length, iris$Sepal.Width)
+plot(iris$Petal.Length, iris$Petal.Width)
+```
+
+テーブルでも同様
+
+```{r}
+#| echo: fenced
+#| layout-nrow: 1
+knitr::kable(iris[1:10, 1:3])
+knitr::kable(iris[1:20, 1:3])
+```
+
+## Fenced Echo
+
+チャンクのコードのプログラミング言語を明示したい場合は、chunk optionの`echo`を`fenced`に設定することで明示できる。
+
+```{{r}}
+#| echo: fenced
+print("Hello")
+```
+
+と書くと、以下の様に表示される。
+
+```{r}
+#| echo: fenced
+print("Hello")
+```
+
+`#| echo: fenced`を指定すると、それ以外のchunk optionはそのまま表示される。
+以下の様に、`#| eval: false`を指定すると、
+
+```{{r}}
+#| echo: fenced
+#| eval: false
+print("Hello")
+```
+
+chunk optionがそのまま表示される。
+
+```{r}
+#| echo: fenced
+#| eval: false
+print("Hello")
+```
+
+実行しないコードについて、なんのコードが明示しておきたい場合は、[Unexecuted blocks](https://quarto.org/docs/computations/execution-options.html#unexecuted-blocks)を使うと良い。
+以下の様に`{`と`}`を2つに増やすと、
+
+```{{{r}}}
+print("Hello")
+```
+
+下の様に表示され、実行しないPythonコードチャンクを明示的に示すことができる。
+
+```{{r}}
+print("Hello")
+```
+
+# Sessioninfo
+
+```{r}
+sessionInfo()
+```
+
