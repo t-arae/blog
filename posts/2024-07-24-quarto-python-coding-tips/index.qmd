@@ -1,0 +1,83 @@
+---
+title: "QuartoのTips (Python版)"
+subtitle: ""
+description: ""
+author: ""
+date: "2024-07-24"
+categories: [python, Quarto]
+---
+
+# 導入
+
+まずは`Rye`を使ってプロジェクト内にPython仮想環境を作成し、必要な依存ライブラリをインストールしておく。
+
+RStudioを使って`.qmd`ファイルを書く場合は、仮想環境を作成したプロジェクトを開き、
+メニューの`Tools/Project Options...`から、Pythonタブを開き、`Select...`ボタンを押して、`Virtual Environments`から作成したvenv内の`python`を選択する。
+
+必要なパッケージが見つからない旨のエラーが出た場合は、一度RStudioを再起動する。
+
+# コードチャンクのオプション
+
+QuartoでPythonのコードチャンク（だけ）を書くと、
+コードを実行する実行エンジンはデフォルトではJupyterが選択される。
+Jupyter特有のオプションは公式ドキュメントの[Jupyter Options](https://quarto.org/docs/computations/execution-options.html#jupyter-options)を参照すると良い。
+
+以下ではいくつか紹介する。
+
+## Figure options
+
+Jupyter特有のオプションではないが、Knitrとの相違点があるオプションとして、
+Knitrでは`fig-width`と`fig-height`はチャンクごとに設定できるが、
+Jupyterでは最低でもドキュメントレベルでしか設定できない。
+
+> When using the Knitr engine, `fig-width` and `fig-height` are supported on a per-cell basis. But when using the Jupyter engine, these options only have an effect if specified at the document- or project-level metadata.
+
+From [Figure options](https://quarto.org/docs/computations/execution-options.html#figure-options)
+
+## Expression Printing
+
+デフォルトではチャンク内の最後の式（expression）しか結果として表示されない。
+
+```{{python}}
+"first"
+"last"
+```
+
+```
+'last'
+```
+
+この挙動は、`IPython.InteractiveShell.ast_node_interactivity.default_value`が`'last_expr'`となっているためである。([Jupyter shell interactivity](https://ipython.readthedocs.io/en/stable/config/options/terminal.html#configtrait-InteractiveShell.ast_node_interactivity))
+
+この挙動を変えて全てのトップレベルの式の評価を出力するには、
+以下の様にYAMLヘッダーの`ipynb-shell-interactivity`を`all`に設定するか、
+
+```
+---
+title: All expressions
+format: html
+ipynb-shell-interactivity: all
+---
+```
+
+`InteractiveShell.ast_node_interactivity`を書き換える。
+
+```{python}
+from IPython import InteractiveShell
+InteractiveShell.ast_node_interactivity = 'all'
+```
+
+```{python}
+#| echo: fenced
+"first"
+"last"
+```
+
+コードチャンクごとにこの設定を変えるやり方は残念ながら分からなかった。
+
+# Sessioninfo
+
+```{python}
+import session_info
+session_info.show()
+```
