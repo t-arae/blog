@@ -1,1 +1,22 @@
 /* css styles */
+
+.cell-output-stdout {
+  background-color: #2D2D2D;
+  border-radius: 5px;
+  padding: 0.5em;
+  margin: 10px 0px;
+}
+
+.cell-output-stdout code {
+  color: #ffffff;
+}
+
+.cell-output-error {
+  background-color: #2D2D2D;
+  border-radius: 5px;
+  padding: 0.5em;
+}
+
+.cell-output-error code {
+  color: #EB9662;
+}
