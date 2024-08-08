@@ -1,0 +1,89 @@
+---
+title: "Quarto shortcodes"
+subtitle: ""
+description: ""
+author: ""
+date: "2024-08-08"
+categories: [Quarto]
+draft: false 
+code-annotations: hover
+format:
+    html:
+        css:
+          - styles_temp.css
+---
+
+[Quarto shortcodes](https://quarto.org/docs/authoring/shortcodes.html)は、
+Quartoの拡張機能の一つで`.qmd`ファイル内に記述することで、
+特別なデータを参照したり、コンテンツを埋め込んだりすることができる。
+ビルトインでいくつかのshortcodeが利用できる（[link](https://quarto.org/docs/authoring/shortcodes.html)）。
+
+
+# Quartoのバージョン
+
+```{r}
+quarto::quarto_version()
+```
+
+# `include` 命令
+
+`include`命令は`.qmd`ファイルに他のテキストファイルを埋め込むことができる。
+`include`命令の書式は以下で、埋め込みたい`.qmd`ファイルのパスを指定する。
+インラインでは使えない。
+
+``` markdown
+{{{< include _something_content.qmd >}}}
+```
+
+上記の様にかいて、同じディレクトリ内に以下のような内容の`.qmd`ファイルがあった場合、
+
+````{.markdown filename="_something_content.qmd"}
+`r readLines("_something_content.qmd") |> paste(collapse = "\n")`
+````
+
+`_something_content.qmd`が`include`命令を記述した箇所で展開されて、
+それからレンダリングされるので以下のように表示される。
+
+::: {#included}
+
+{{< include _something_content.qmd >}}
+
+:::
+
+`include`命令を使うとテキストファイルなら内容を埋め込むことができるが、
+チャンク内での計算を行う場合には以下の二点の必要条件がある。
+
+1. チャンク内計算は`.qmd`ファイルのみ
+2. 埋め込まれた状態で全てのチャンクで単一のエンジン（`knitr` or `jupyter`）を使用する
+
+# `pagebreak`命令
+
+`pagebreak`命令を使うと、出力フォーマットに応じた改ページを挿入することができる。
+
+``` markdown
+{{{< pagebreak >}}}
+```
+
+{{< pagebreak >}}
+
+Previous Page
+
+{{< pagebreak >}}
+
+Next Page
+
+# `kbd`命令
+
+`kbd`命令を使うと、キーボードのキーを示すことができる。
+インラインで使用することができる。
+
+```{markdown}
+#| shortcode: false
+{{< kbd Shift >}} + {{< kbd P >}}
+{{< kbd - >}}
+To print, press {{< kbd Shift-Ctrl-P >}}. To open an existing new project, press {{< kbd mac=Shift-Command-O win=Shift-Control-O linux=Shift-Ctrl-L >}}.
+```
+
+{{< kbd Shift >}} + {{< kbd P >}}
+{{< kbd - >}}
+To print, press {{< kbd Shift-Ctrl-P >}}. To open an existing new project, press {{< kbd mac=Shift-Command-O win=Shift-Control-O linux=Shift-Ctrl-L >}}.

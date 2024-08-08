@@ -1,0 +1,6 @@
+This content comes from the `_something_content.qmd` file.
+
+```{r}
+#| echo: fenced
+fs::dir_tree()
+```
