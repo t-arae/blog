@@ -1,0 +1,86 @@
+---
+title: "Quartoのdivとspan"
+subtitle: ""
+description: ""
+author: ""
+date: "2024-08-09"
+categories: [Quarto]
+draft: false
+format:
+    html:
+        css:
+          - styles_temp.css
+---
+
+Quartoでdivとspanタグを明示的に利用するには、特定の記法を使用する [link](https://quarto.org/docs/authoring/markdown-basics.html#sec-divs-and-spans)。
+
+# Quartoのバージョン
+
+```{r}
+quarto::quarto_version()
+```
+
+# Div
+
+以下のようにして、明示的に`div`タグを指定することができる。
+
+``` markdown
+::: {.border .bg-primary .text-center .shadow .m-3 .pt-2}
+この文字列は[BootstrapのAPI](https://getbootstrap.jp/docs/5.3/utilities/api/)で修飾されます
+:::
+```
+
+::: {.border .bg-primary .text-center .shadow .m-3 .pt-2}
+この文字列は[BootstrapのAPI](https://getbootstrap.jp/docs/5.3/utilities/api/)で修飾されます
+:::
+
+`id`と`class`、`key=value`はそれぞれ以下の様に設定できる。
+
+```{.css filename="styles.css"}
+{{< include styles_temp.css >}}
+```
+
+``` markdown
+:::{#redtext}
+text
+:::
+
+:::{.fw-bold}
+text
+:::
+
+:::{contenteditable="true"}
+text
+:::
+```
+
+:::::{.grid}
+::::{.g-col-4}
+:::{#redtext}
+text
+:::
+::::
+
+::::{.g-col-4}
+:::{.fw-bold}
+text
+:::
+::::
+
+::::{.g-col-4}
+:::{contenteditable="true"}
+text
+:::
+::::
+:::::
+
+# Span
+
+`span`タグを設定するには以下の様にする。
+
+``` markdown
+[これはspanタグで修飾される]{#redtext .fw-bold contenteditable="true"}
+```
+
+[これはspanタグで修飾される]{#redtext .fw-bold contenteditable="true"}
+
