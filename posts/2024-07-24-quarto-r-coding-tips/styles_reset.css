@@ -1,0 +1,19 @@
+section#class-output-class-warning-class-message-class-error div.cell-output-stdout {
+  background-color: unset;
+  border-radius: unset;
+  padding: unset;
+}
+
+section#class-output-class-warning-class-message-class-error div.cell-output-stdout code {
+  color: unset;
+}
+
+section#class-output-class-warning-class-message-class-error .cell-output-error {
+  background-color: unset;
+  border-radius: unset;
+  padding: unset;
+}
+
+section#class-output-class-warning-class-message-class-error .cell-output-error code {
+  color: unset;
+}

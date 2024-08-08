@@ -1,0 +1,131 @@
+---
+title: "QuartoのTips (R版)"
+subtitle: ""
+description: ""
+author: ""
+date: "2024-07-24"
+categories: [knitr, R, Quarto]
+format:
+    html:
+        css:
+          - styles_reset.css
+          - styles_temp.css
+---
+
+R (`knitr`)特有の設定などについて紹介する。
+
+# Chunk options
+## `class-output`, `class-warning`, `class-message`, `class-error`
+
+Chunkのコードを実行して、コンソールに現れる文字列を表示するCSSを指定する。
+
+```{.css filename="styles.css"}
+{{< include styles_temp.css >}}
+```
+
+```{r}
+#| echo: fenced
+#| class-output: stdout
+print("Hello")
+```
+
+```{r}
+#| echo: fenced
+#| error: true
+#| class-error: stderr
+stop("This is an error.")
+```
+
+## `eval` 
+
+`eval`オプションに渡す真偽値（`true` or `false`）をRの式の評価結果に変更する。
+
+```{r}
+#| echo: fenced
+#| eval: !expr 1 > 0
+print("evaluated")
+```
+
+```{r}
+#| echo: fenced
+#| eval: !expr 1 > 2
+print("not evaluated")
+```
+
+ただし式が`!`から始まっている場合は引用符で囲む必要がある。
+
+```{{r}}
+#| eval: !expr !FALSE
+# 👆これはダメ❌
+```
+
+```{r}
+#| echo: fenced
+#| eval: !expr "!FALSE"
+# 👆これは大丈夫⭕️
+print("evaluated")
+```
+
+参考URL：[メモ：Quartoで #| を使ってチャンク内にチャンクオプションを書く時に !expr がエラーになった（がもう直っている）](https://notchained.hatenablog.com/entry/2022/04/30/214805)
+
+
+## `fig-width`, `fig-height`
+
+出力する図の物理的な（表示上ではない）大きさを制御する。
+単位がinchなのでmmに換算するには1 inch = 25.4 mmなので25.4で割る。
+ファイルに書き出す図と見た目を揃えたい時に使える。
+
+```{r}
+library(ggplot2)
+gp <-
+  ggplot(iris, aes(Sepal.Length, Sepal.Width)) +
+  geom_point(aes(color = Species)) +
+  theme_minimal()
+```
+
+::::{.columns}
+:::{.column}
+```{r}
+#| echo: fenced
+#| fig-width: !expr "150/25.4"
+#| fig-height: !expr "100/25.4" 
+# 幅 150 mm 高さ 100 mm のプロットとして出力
+gp
+```
+:::
+:::{.column}
+```{r}
+#| echo: fenced
+#| fig-width: !expr "300/25.4"
+#| fig-height: !expr "200/25.4" 
+# 幅 300 mm 高さ 200 mm のプロットとして出力
+gp
+```
+:::
+::::
+
+```{r}
+# 同じサイズでファイルに出力したプロットと見栄えが同じになる。
+ggsave("output.png", gp, width = 150, height = 100, units = "mm")
+```
+
+![](output.png){width=50%}
+
+# Working directory
+
+`setwd()`でworking directoryを変更しても、chunkごとにworking directoryはリセットされる。
+
+```{r}
+setwd("..")
+getwd()
+```
+
+```{r}
+getwd()
+```
+
+# Sessioninfo
+
+```{r}
+sessionInfo()
+```
