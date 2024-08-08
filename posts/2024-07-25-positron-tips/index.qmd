@@ -1,0 +1,39 @@
+---
+title: "Positronのメモ"
+subtitle: ""
+description: ""
+author: ""
+date: "2024-07-25"
+categories: [Positron]
+---
+
+## PositronでVimのキーバインディングを使う
+
+VSCodeのExtensionであるvscodevimを導入する。
+Macで使う場合はカーソル移動時などに連続でキーを入力することができなかったので設定をする必要がある。
+ExtensionのDetailsのところにも書いてあるが、ターミナルで`defaults`コマンドを使って設定する。
+
+```{.bash}
+# これがDetailsのところに書いてあるコマンド。これを実行してもPositronでは反映されない。
+defaults write com.microsoft.VSCode ApplePressAndHoldEnabled -bool false
+```
+
+Positronの設定のdomainを探す。
+
+```{.bash}
+defaults find positron | grep positron
+#> Found 8 keys in domain 'com.rstudio.positron': {
+#>                 "bundle-identifier" = "com.rstudio.positron";
+```
+
+元のコマンドのdomainを書き換えて実行し、Positronを再起動することで、設定が有効化される。
+
+```{.bash}
+defaults write com.rstudio.positron ApplePressAndHoldEnabled -bool false
+```
+
+## RStudioのキーマップを使う
+
+Settingsから"rstudio"と検索して、「RStudio > Keymap: Enable」にチェックを入れる。
+
+⌘ + ⇧ + Mで挿入するパイプ演算子は、Settingsで「Positron > R: Pipe」から選択する。
