@@ -1,0 +1,120 @@
+---
+title: "numpy.float64の端数処理"
+subtitle: ""
+description: ""
+author: ""
+date: "2024-07-25"
+categories: [numpy, python]
+---
+
+# TL;DR
+Pythonビルトインのデータ型である`float`と`numpy.float64`は同じ浮動小数点数でも、
+`print()`や、`round()`に渡した場合の挙動が若干異なる場合がある。
+
+これは`numpy.round()`が、ビルトインの`round()`に比べて不正確な丸めを行うためである。
+
+# 偶数丸め
+
+Pythonのビルトインの`round()`は偶数丸めによる端数処理を行う。([公式ドキュメント](https://docs.python.org/ja/3/library/functions.html#round))
+
+> 二つの倍数が同じだけ近いなら、偶数を選ぶ方に (そのため、例えば round(0.5) と round(-0.5) は両方とも 0 に、 round(1.5) は 2 に) 丸められます。
+
+偶数丸めとは、四捨五入を行うことで発生するバイアスを相殺する丸め方である。
+例えば[ここ](https://web.fourm.co.jp/blog20221207/)がわかりやすかった。
+
+偶数丸めは四捨五入による端数処理とは異なる結果になることがある。
+Pythonで四捨五入による丸めを行うには、`decimal`パッケージを用いる。
+([参考](https://note.nkmk.me/python-round-decimal-quantize/#_3))
+以下では、`{python} [round(i * 0.1, 1) for i in range(1, 21, 1)]`のそれぞれの数について、
+偶数丸め（to even）と四捨五入（half up）で端数処理した結果を示す。
+
+```{python}
+from IPython import InteractiveShell
+InteractiveShell.ast_node_interactivity = 'all'
+
+import session_info
+```
+
+```{python}
+#| output: asis
+#| layout-ncol: 2
+from decimal import Decimal, ROUND_HALF_UP
+
+# 数のリストを受け取って、偶数丸めと四捨五入の表を表示しつつ、それぞれの合計値を返す関数
+def print_rounded(nums):
+  print("|num|to even|half up|\n|:-:|-:|-:|")
+  sums = [0, 0, 0]
+  for num in nums:
+    rnum = round(num)
+    deci = Decimal(str(num))
+    rdeci = deci.quantize(Decimal('0'), ROUND_HALF_UP)
+    sums[0] += round(num, 2)
+    sums[1] += rnum
+    sums[2] += float(rdeci)
+    print(f"|{round(num, 2)}|{rnum}|{rdeci}|")
+  print("\n")
+  return sums
+
+seq = [i * 0.1 for i in range(1, 21, 1)]
+sums1 = print_rounded(seq[0:10])
+sums2 = print_rounded(seq[10:20])
+```
+
+端数処理された結果をみると、偶数丸めでは0.5は0に、1.5は2に丸められている。
+元の数列と偶数丸め、四捨五入した数列の合計を考えると、
+四捨五入した数列では1増加する間に0.5ずつ増加するため、合計値が1多くなる。
+一方で、偶数丸めでは、増分が相殺されるため、合計値は元の数列と等しくなる。
+
+```{python}
+sums1
+sums2
+[i + j for i, j in zip(sums1, sums2)]
+```
+
+# `numpy.round`での端数処理
+
+では、`numpy.float64`に対する丸めはどうなっているのだろうか？
+ビルトインの`round()`に`numpy.float64`を渡すと、`numpy.float64.__round__`メソッドを呼び出す。
+そこで、 先ほどのコードで四捨五入していたところを`numpy`に変えつつ、
+数列を少し小さな値に変更して実行してみる。
+
+```{python}
+#| output: asis
+#| layout-ncol: 2
+import numpy as np
+
+# 数のリストを受け取って、builtinとnumpyで丸めた表を表示する関数
+def print_rounded2(nums):
+  print("|num|built-in|numpy|\n|:-:|-:|-:|")
+  sums = [0, 0, 0]
+  for num in nums:
+    rnum = round(num, 1)
+    npf = np.float64(num)
+    rnpf= round(npf, 1)
+    print(f"|{round(num, 2)}|{rnum}|{rnpf}|")
+  print("\n")
+
+seq = [i * 0.01 for i in range(1, 21, 1)]
+print_rounded2(seq[0:10])
+print_rounded2(seq[10:20])
+```
+
+すると、0.05と0.15を丸める時の挙動がbuilt-inと異なっており、
+四捨五入とも偶数丸めの挙動とも一致しないことがわかる。
+これは、`numpy.round`が高速だが少し不正確なアルゴリズムを使っているためらしい。
+
+> `np.round` uses a fast but sometimes inexact algorithm to round floating-point datatypes.
+
+[`np.round`公式ドキュメント](https://numpy.org/doc/stable/reference/generated/numpy.round.html)
+
+- 参考 [NumPy配列ndarrayを四捨五入・偶数丸めするnp.round - note.nkmk.me](https://note.nkmk.me/python-numpy-round/#nproundpythonround)
+
+# まとめ
+
+`numpy`で書かれたコードを書き直す場合は、端数処理に気を付ける必要がある。
+
+# Sessioninfo
+
+```{python}
+session_info.show()
+```
