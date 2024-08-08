@@ -13,6 +13,17 @@ Quartoでドキュメントを書く際に使えるテクニックの備忘録�
 
 ```{r}
 quarto::quarto_version()
+
+```
+
+# エラーメッセージを表示する
+
+chunk optionの`error`を`true`に設定する。
+
+```{r}
+#| echo: fenced
+#| error: true
+stop("This is error message.")
 ```
 
 # Chunkの出力を2カラムで
@@ -42,6 +53,7 @@ knitr::kable(iris[1:10, 1:3])
 knitr::kable(iris[1:20, 1:3])
 ```
 
+# コードの表示設定
 ## Fenced Echo
 
 チャンクのコードのプログラミング言語を明示したい場合は、chunk optionの`echo`を`fenced`に設定することで明示できる。
@@ -75,18 +87,65 @@ chunk optionがそのまま表示される。
 print("Hello")
 ```
 
+## Unexecuted blocks
+
 実行しないコードについて、なんのコードが明示しておきたい場合は、[Unexecuted blocks](https://quarto.org/docs/computations/execution-options.html#unexecuted-blocks)を使うと良い。
 以下の様に`{`と`}`を2つに増やすと、
 
-```{{{r}}}
+```{{{python}}}
 print("Hello")
 ```
 
 下の様に表示され、実行しないPythonコードチャンクを明示的に示すことができる。
 
-```{{r}}
+```{{python}}
 print("Hello")
 ```
+
+文法的に間違ったChunk optionを持つコードチャンクを例示することにも使える。
+
+## Code block
+
+実行しないコードをUexecuted blocksとして表す以外にも、単にコードブロックとして記述する方法もある
+([Markdown Basics / Source Code](https://quarto.org/docs/authoring/markdown-basics.html#source-code))。
+以下のように書くとどちらも同じ出力になる。
+
+````
+``` python
+print("Hello")
+```
+
+```{.python}
+print("Hello")
+```
+````
+
+```{.python}
+print("Hello")
+```
+
+また、ファイル名や行番号を設定することもできる（[Line Numbers](https://quarto.org/docs/output-formats/html-code.html#line-numbers), [Code Filename](https://quarto.org/docs/output-formats/html-code.html#code-filename)）。
+
+````
+``` {.python filename="example.py" code-line-numbers="true"}
+import matplotlib.pyplot as plt
+plt.plot([1,23,2,4])
+plt.show()
+```
+````
+
+``` {.python filename="example.py" code-line-numbers="true"}
+import matplotlib.pyplot as plt
+plt.plot([1,23,2,4])
+plt.show()
+```
+
+# 出力フォーマットに応じて表示を変える
+
+[Conditional Content](https://quarto.org/docs/authoring/conditional.html)は、
+出力フォーマットに応じて表示するかしないかを制御する仕組みである。
+詳細はリンク先を参照。
+
 
 # Sessioninfo
 
