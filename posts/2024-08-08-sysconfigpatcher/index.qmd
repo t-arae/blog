@@ -1,0 +1,118 @@
+---
+title: "Ryeで入れたPythonがreticulateから使えない問題"
+subtitle: ""
+description: ""
+author: ""
+date: "2024-08-08"
+categories: [bug, rye, reticulate, R, python]
+engine: knitr
+---
+
+Pythonの環境管理ツールである`rye`でインストールしたPythonを、
+RからPythonを使うためのパッケージ`reticulate`で使えなかった問題の解決について。
+
+# 発端
+
+`rye`でインストールしたPythonを`reticulate`から利用しようとすると
+`--enable-shared`を有効化しろというエラーメッセージがでて、
+使うことが出来なかった。
+これは`libpython`という他の言語からPythonを利用するための共有ライブラリが見つからないことに起因するエラーらしい。
+
+# 原因
+
+`rye`のGitHubページのIssueを探してみると、関連するものがあった。
+
+- [Patch build info at install time #646](https://github.com/astral-sh/rye/issues/646)
+
+`rye`でインストールされるPythonは事前にコンパイルされたバイナリを[ここ](https://github.com/indygreg/python-build-standalone)からとってきている。
+そしてこのPythonはビルド時にちゃんと`--enable-shared`フラグをつけてビルドされているのだが、
+共有ライブラリのパスが正しく設定されておらず、結果として上述のエラーにつながっているらしい。
+
+参考
+
+- [Philosophy - Rye](https://rye.astral.sh/philosophy/)
+    - Pythonをどこから入手しているか
+- [Patch build info at install time #646](https://github.com/astral-sh/rye/issues/646)
+    - Issue
+- [bluss/sysconfigpatcher](https://github.com/bluss/sysconfigpatcher)
+    - パスの設定を修正するPythonのプログラム
+
+# 解決
+
+上記のIssueのところで紹介されていた修正用のプログラム（`sysconfigpatcher`）を使うことで、
+インストールしたPythonの共有ライブラリのパスを書き換えて、エラーを解決することが出来た。
+
+まずは、`rye`をつかって`sysconfigpatcher`をインストールする。
+
+```{bash}
+#| eval: false
+rye tools install --git 'https://github.com/bluss/sysconfigpatcher' sysconfigpatcher
+``` 
+
+次に、`rye`でインストールした共有ライブラリのパスが間違っているかを確認する。
+設定されている共有ライブラリのパスは`/install/lib`だが、このディレクトリは自分のPC上に存在しない。
+
+```{bash}
+#| eval: false
+python -m sysconfig | grep LIBDIR
+#>     LIBDIR = "/install/lib"
+#>     PLATLIBDIR = "lib"
+
+ls /install/lib
+#> ls: /install/lib: No such file or directory
+```
+
+`.venv`内のPythonはシンボリックリンクなので、実体があるファイルパスを探す。
+この場合は`/Users/t_arae/.rye/py/cpython@3.12.2/install/bin/python3.12`にある。
+
+```{bash}
+#| eval: false
+ls -l `which python`
+#> lrwxr-xr-x  1 t_arae  staff  59 Jul 21 22:52 /Users/t_arae/blog/.venv/bin/python -> /Users/t_arae/.rye/py/cpython@3.12.2/install/bin/python3.12
+```
+
+`sysconfigpatcher`で指定するのは、`/Users/t_arae/.rye/py/cpython@3.12.2`の部分らしい。
+書き換える前に`--dry-run`フラグで動作を確認できる。
+
+```{bash}
+#| eval: false
+sysconfigpatcher --dry-run /Users/t_arae/.rye/py/cpython@3.12.2
+#> INFO: Would patch /Users/t_arae/.rye/py/cpython@3.12.2/install/lib/python3.12/_sysconfigdata__darwin_darwin.py
+#> INFO: Would patch /Users/t_arae/.rye/py/cpython@3.12.2/install/lib/pkgconfig/python-3.12-embed.pc
+#> INFO: Would patch /Users/t_arae/.rye/py/cpython@3.12.2/install/lib/pkgconfig/python-3.12.pc
+```
+
+書き換え実行。
+
+```{bash}
+#| eval: false
+sysconfigpatcher /Users/t_arae/.rye/py/cpython@3.12.2
+#> INFO: Patched /Users/t_arae/.rye/py/cpython@3.12.2/install/lib/python3.12/_sysconfigdata__darwin_darwin.py
+#> INFO: Patched /Users/t_arae/.rye/py/cpython@3.12.2/install/lib/pkgconfig/python-3.12-embed.pc
+#> INFO: Patched /Users/t_arae/.rye/py/cpython@3.12.2/install/lib/pkgconfig/python-3.12.pc
+```
+
+共有ライブラリのパスが書き換わったか確認。
+ちゃんと、`libpython3.12.dylib`があるディレクトリが指定できている。
+
+```{bash}
+#| eval: false
+python -m sysconfig | grep LIBDIR
+#>     LIBDIR = "/Users/t_arae/.rye/py/cpython@3.12.2/install/lib"
+#>     PLATLIBDIR = "lib"
+
+ls /Users/t_arae/.rye/py/cpython@3.12.2/install/lib
+#> itcl4.2.2               pkgconfig               tcl8.6
+#> libpython3.12.a         python3.12              thread2.8.7
+#> libpython3.12.dylib     tcl8                    tk8.6
+```
+
+`reticulate`パッケージできちんとPythonが使えるか確認。
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+reticulate::py_config()
+
+reticulate::py_eval("1 + 1")
+```
