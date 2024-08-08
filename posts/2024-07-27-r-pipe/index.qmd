@@ -1,0 +1,88 @@
+---
+title: "パイプ演算子のすすめ（イントロ）"
+subtitle: ""
+description: ""
+author: ""
+date: "2024-07-27"
+categories: [pipe, magrittr, R]
+draft: false
+code-annotations: hover
+---
+
+パイプ演算子をマスターしていると、Rのコーディングが格段に楽になる。
+これからいくつかの記事に分けてRにおけるパイプ演算子について紹介したいと思う。
+
+:::{.callout-note title="関連記事"}
+
+- [パイプ演算子のすすめ（イントロ)](../2024-07-27-r-pipe)
+- [パイプ演算子のすすめ（利点編)](../2024-07-27-r-pipe1)
+- [パイプ演算子のすすめ（種類編)](../2024-07-27-r-pipe2)
+
+:::
+
+まず、この記事ではパイプ演算子とは何かを簡単に解説する。
+
+# パイプ演算子（Pipe operator）とは？
+
+多くの場合、Rでは関数にデータを渡してさまざまな処理を行う。
+各関数は入力として期待するデータの種類（型・クラス）があり、
+関数`f()`の**出力**と関数`g()`の**入力**が同じ種類のデータである場合、
+以下のようにして、`f()`の実行結果を`g()`の入力として渡すことができる。
+
+```{r}
+#| eval: false
+result1 <- f(input)
+result2 <- g(result1)
+
+# あるいは以下のように書くこともできる。
+result2 <- g(f(input))
+```
+
+しかし、複数の関数を連続して適用する場合、先ほどの書き方だと見通しが徐々に悪くなる。
+
+```{r}
+#| eval: false
+result1 <- f(input)
+result2 <- g(result1)
+result3 <- h(result2)
+result4 <- i(result3)
+result_final <- j(result4)
+
+# あるいは
+result_final <- j(i(h(g(f(input)))))
+```
+
+この様に連続して複数の処理を行うコードを、データを次々に受け渡すパイプラインの様に表現できると便利である。
+
+パイプ演算子とはまさにこれを実現するための演算子である。
+パイプ演算子は`+`や`-`などと同じく左辺（Left-hand side, LHS）と右辺（Right-hand side, RHS）をとる二項演算子であり、
+演算子の左側の結果（LHS）を、右側の関数（RHS）の第一引数とした関数を合成する。
+
+パイプ演算子（`|>`）を用いると、さきほどの処理は次のように書くことができる。
+
+```{r}
+#| eval: false
+# パイプ演算子なし
+result_final <- j(i(h(g(f(input)))))
+
+# パイプ演算子あり
+result_final <- input |> f() |> g() |> h() |> i() |> j()
+```
+
+パイプ演算子を使わない場合には、関数が入れ子構造になっていて、コードが見にくい。
+また、処理の順番と入れ子の順番が逆なので、直感的にわかりにくい。
+
+パイプ演算子を用いると、入れ子構造が解消され、処理の順番がコードから一目瞭然になる。
+
+:::{.callout-important}
+パイプ演算子を活用してコードの意図を明確にしよう。
+:::
+
+# 参考
+
+- [`magrittr` package](https://magrittr.tidyverse.org/index.html)
+- [パイプ演算子自作入門](https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://igjit.github.io/slides/2018/01/tiny_pipe/&ved=2ahUKEwjEuK3rh72HAxUUk68BHVN-AQ0QFnoECC0QAQ&usg=AOvVaw1VcYIba0yEOihJLTPRtEhI)
+- [R 4.1で入ると噂の|>が開発版のRに入ったので触ってみた。](https://notchained.hatenablog.com/entry/2020/12/05/004702)
+- [R 4.1で入るnative pipe（|>）の現状確認](https://notchained.hatenablog.com/entry/2021/04/29/204046)
+- [ R 4.2.0のリリースでにわかに盛り上がる Base Pipe “|>” とは何なのか? %>%との違いを調べました](https://excel2rlang.com/base-pipe-r420/)
+

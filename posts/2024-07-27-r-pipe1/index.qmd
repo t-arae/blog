@@ -1,0 +1,307 @@
+---
+title: "パイプ演算子のすすめ（利点編）"
+subtitle: ""
+description: ""
+author: ""
+date: "2024-07-27"
+categories: [pipe, magrittr, R]
+draft: false
+code-annotations: hover
+---
+
+# パイプ演算子を使う利点
+
+ここではパイプ演算子を積極的に使用してコードを書くモチベーションとするために、
+パイプ演算子を使用することによるいくつかの利点を紹介したい。
+
+:::{.callout-note title="関連記事"}
+
+- [パイプ演算子のすすめ（イントロ)](../2024-07-27-r-pipe)
+- [パイプ演算子のすすめ（利点編)](../2024-07-27-r-pipe1)
+- [パイプ演算子のすすめ（種類編)](../2024-07-27-r-pipe2)
+
+:::
+
+## 利点1（コードが見やすくなる）
+
+前の項で説明した様に、パイプ演算子を使ってコードを記述すると読み取りやすくなる場合が多い。
+
+以下では、ファイル読み込み、データ処理、ファイル書き出しを行う擬似的なコードを、
+パイプ演算子を使って記述した。
+
+```{r}
+#| eval: false
+# 例）csvファイルを読み込んで、必要な情報の列を選択し、p値でフィルタリングして、
+# 変動が大きい順に並べ替えてから、csvファイルに書き出す例
+path_to_input_csv |>
+  readr::read_csv() |>
+  dplyr::select(gene_name, treatment, fold_change, p_value) |>
+  dplyr::filter(p_value <= 0.05) |>
+  dplyr::arrange(desc(fold_change)) |>
+  readr::write_csv(file = path_to_output_csv)
+```
+
+このコードをパイプ演算子を使わずに無理やり書くと下のようになる。
+非常にわかりにくく感じられると思う。
+
+```{r}
+#| eval: false
+readr::write_csv(
+  dplyr::arrange( # <1>
+    dplyr::filter( # <2>
+      dplyr::select( # <2>
+        readr::read_csv( # <2>
+          path_to_input_csv # <2>
+        ), # <2>
+        gene_name, treatment, fold_change, p_value # <2>
+      ), # <2>
+      p_value <= 0.05 # <2>
+    ), # <2>
+    desc(fold_change) # <3>
+  ), # <3>
+  file = path_to_output_csv
+)
+```
+
+1. `dplyr::arrange()`関数が現れるのはこの位置
+2. `dplyr::arrange()`の第一引数
+3. `dplyr::arrange()`の第二引数
+
+また、これは次の利点にも関わることだが、パイプ演算子を使わずに書くコードでは
+一つのデータ処理が行ごとにまとまっていない。
+例えば、`fold_change`列の値で降順に並べ替える処理の記述は①と③の行に分かれてしまっている。
+これもわかりにくさを助長する要因となる。
+
+:::{.callout-tip}
+パイプ演算子を使うことで、見やすく理解しやすいコードを書くことができる。
+:::
+
+## 利点2（処理の確認・修正が容易になる）
+
+パイプ演算子を使ってコードを記述する利点は他にもある。
+
+Rでデータ処理を行うコードを書くときには、試行錯誤をすることが多いだろう。
+その様なときに、パイプラインの途中のデータの状態を確認したくなる場面は多い。
+
+例えば以下のコードを例にして考える。
+
+```{r}
+library(ggplot2)
+# 前処理を行ったdata.frameを受け取って、散布図を描く関数
+plot_points <- function(tbl) {
+  tbl |>
+  ggplot(aes(Sepal.Length, Sepal.Width)) +
+  geom_point(aes(color = Species), size = 3)
+}
+
+iris |>
+  tibble::as_tibble() |>
+  dplyr::select(Species, Sepal.Length, Sepal.Width) |> #<1>
+  dplyr::filter(Species %in% c("versicolor", "virginica")) |>
+  dplyr::mutate(Species = forcats::fct_rev(Species)) |>
+  plot_points()
+```
+
+1. この操作はいったい何をしているのだろうか？
+
+①までのデータ処理を終えた中間結果を確認したいと思ったとき、どうようにすれば良いだろうか？
+これは簡単で、①のパイプ演算子前までを選択してコードを実行してみるか、
+あるいは以下の様に①の次の行に`return()`を書いて、そこまで実行すれば良い。
+
+選択範囲のコードを実行するには、RStudioならCtrl + Shift + Enterを押す（MacならCtrlではなく⌘）。
+
+```{r}
+#| eval: false
+iris |>
+  tibble::as_tibble() |>
+  dplyr::select(Species, Sepal.Length, Sepal.Width) |> #<1>
+  return() #<2>
+  dplyr::filter(Species %in% c("setosa", "virginica")) |> #<3>
+  dplyr::mutate(Species = forcats::fct_rev(Species)) |> #<3>
+  plot_points() #<3>
+```
+
+1. このパイプ演算子の前までを選択して実行。
+2. あるいは`return()`を書いて、この行までを選択して実行。
+3. これらの行は実行しないように。コメントアウトしておいても良い。
+
+:::{.callout-tip}
+`return()`をパイプ演算子の直後に書くことで、そこまでの途中結果を確認できる。
+:::
+
+では次に、パイプライン中のある処理の有り無しで結果（出力される図）がどう変わるか確認してみよう。
+下のコードの①②それぞれの処理をしない場合、結果はどう変わるだろうか？
+これを確かめるには、単にそれぞれの行をコメントアウトし、処理をスキップさせるだけで良い。
+
+元のコードと実行結果は、
+
+::::{.columns}
+:::{.column width=60%}
+```{r}
+#| eval: false
+iris |>
+  tibble::as_tibble() |>
+  dplyr::select(Species, Sepal.Length, Sepal.Width) |>
+  dplyr::filter(Species %in% c("setosa", "virginica")) |> #<1>
+  dplyr::mutate(Species = forcats::fct_rev(Species)) |> #<2>
+  plot_points()
+```
+
+1. ""
+2. ""
+
+:::
+:::{.column width=40%}
+```{r}
+#| echo: false
+iris |>
+  tibble::as_tibble() |>
+  dplyr::select(Species, Sepal.Length, Sepal.Width) |>
+  dplyr::filter(Species %in% c("setosa", "virginica")) |>
+  dplyr::mutate(Species = forcats::fct_rev(Species)) |>
+  plot_points()
+```
+:::
+::::
+
+
+### ①をコメントアウト
+::::{.columns}
+:::{.column width=60%}
+```{r}
+#| eval: false
+iris |>
+  tibble::as_tibble() |>
+  dplyr::select(Species, Sepal.Length, Sepal.Width) |>
+  # dplyr::filter(Species %in% c("setosa", "virginica")) |>
+  dplyr::mutate(Species = forcats::fct_rev(Species)) |>
+  plot_points()
+```
+:::
+
+:::{.column width=40%}
+```{r}
+#| echo: false
+iris |>
+  tibble::as_tibble() |>
+  dplyr::select(Species, Sepal.Length, Sepal.Width) |>
+  dplyr::mutate(Species = forcats::fct_rev(Species)) |>
+  plot_points()
+```
+:::
+::::
+
+①をコメントアウトすると変数が一つ増えている。
+つまりコメントアウトした行は、`Species`列の変数のうち
+`setosa`と`virginica`だけをフィルタリングする処理をしている。
+
+### ②をコメントアウト
+::::{.columns}
+:::{.column width=60%}
+```{r}
+#| eval: false
+iris |>
+  tibble::as_tibble() |>
+  dplyr::select(Species, Sepal.Length, Sepal.Width) |>
+  dplyr::filter(Species %in% c("setosa", "virginica")) |>
+  # dplyr::mutate(Species = forcats::fct_rev(Species)) |>
+  plot_points()
+```
+:::
+:::{.column width=40%}
+```{r}
+#| echo: false
+iris |>
+  tibble::as_tibble() |>
+  dplyr::select(Species, Sepal.Length, Sepal.Width) |>
+  dplyr::filter(Species %in% c("setosa", "virginica")) |>
+  plot_points()
+```
+:::
+::::
+
+②をコメントアウトすると色が入れ替わる。
+つまりコメントアウトした行は、`Species`列の変数の順序を決める処理をしている。
+
+このように、パイプ演算子を使って書いたコードは行ごとに処理を分けて書くことができ、
+それによって一部選択やコメントアウトを使うことで、 色々な処理を探索的に・簡単に試すことができる。
+
+:::{.callout-tip}
+コメントアウトをうまく活用することで、簡単な変更・修正を探索的に試すことができる。
+:::
+
+## 利点3（一行で複数の処理を書きやすい）
+
+多くの場合、Rのコードはソースコードファイルに書いて記録し、
+必要な部分を選択して実行する場合が多いと思う。
+ここまでのパイプ演算子の利点はそういった場合、つまり改行して複数行のコードを書く場合の利点だった。
+
+一方で、コンソールに直接簡単なRコードを打ち込んで実行する場合もあると思う。
+コンソールにコードを打ち込む時は、普通改行は使用できないが、実はこのときにもパイプ演算子は便利である。
+
+以下は、あるコードを書こうと考えた時のカーソルの位置(`v`)の変遷を示している（途中まで）。
+見てわかる通り、前後に大きく行ったり来たりしている。
+これはまだ関数を2つしか使おうとしていないので、より長い処理を書こうと思うと、
+どんどんカーソルの位置の変更が大変になってしまう。
+
+```{{R console}}
+     v #<1>
+> iris #<1>
+  v #<2>
+> iris #<2>
+               v #<3>
+> dplyr::filter(iris #<3>
+                   v #<4>
+> dplyr::filter(iris #<4>
+                                         v #<5>
+> dplyr::filter(iris, Species == 'setosa') #<5>
+  v #<6>
+> dplyr::filter(iris, Species == 'setosa') #<6>
+                  v #<7>
+> dplyr::summarise(dplyr::filter(iris, Species == 'setosa') #<7>
+                                                          v #<8>
+> dplyr::summarise(dplyr::filter(iris, Species == 'setosa') #<8>
+```
+
+1. まず使うデータを打ち込む。(v: カーソル位置)
+2. dplyr::filter()を使ってフィルタリングしたい。カーソルを戻す。
+3. "dplyr::filter("を追記。
+4. フィルタリング条件を書く。カーソルを先に進める。
+5. フィルタリング条件", Species == 'setosa')"を追記。
+6. dplyr::summarise()を使って集計したい。カーソルを戻す。
+7. "dplyr::summarise("を追記。
+8. 集計条件を書きたい。カーソルを先に進める。
+
+一方でパイプ演算子を使って書くとどうなるか、以下のカーソルの動きを見てほしい。
+パイプ演算子を使うことで、カーソルの前後の動きはほぼなくなり、
+ただ必要な処理を順番に書いていくだけでよくなる。
+
+```{{R console}}
+     v #<1>
+> iris #<1>
+                       v #<2>
+> iris |> dplyr::filter( #<2>
+                                           v #<3>
+> iris |> dplyr::filter(Species == 'setosa') #<3>
+                                                                v #<4>
+> iris |> dplyr::filter(Species == 'setosa') |> dplyr::summarise( #<4>
+```
+
+1. まず使うデータを打ち込む。(v: カーソル位置)
+2. dplyr::filter()を使ってフィルタリングしたい。"|> dplyr::filter("を追記。
+3. フィルタリング条件", Species == 'setosa')"を追記。
+4. dplyr::summarise()を使って集計したい。"|> dplyr::summarise("を追記。
+
+これは、コンソールで複数の関数を使用した長い処理を一行で書く必要があるときに、
+パイプ演算子を使って書く方が格段にコーディングが楽になるということである。
+
+:::{.callout-tip}
+パイプ演算子を使うと、コンソールでの一行コード（ワンライナー）の記述が楽。
+:::
+
+# Sessioninfo
+
+```{r}
+sessionInfo()
+```
+

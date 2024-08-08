@@ -1,0 +1,241 @@
+---
+title: "パイプ演算子のすすめ（種類編）"
+subtitle: ""
+description: ""
+author: ""
+date: "2024-07-27"
+categories: [pipe, magrittr, R]
+draft: false
+code-annotations: hover
+---
+
+# パイプ演算子の種類
+
+Rでは複数の種類のパイプ演算子が知られている。
+ここではいくつかのパイプ演算子について紹介したい。
+
+:::{.callout-note title="関連記事"}
+
+- [パイプ演算子のすすめ（イントロ)](../2024-07-27-r-pipe)
+- [パイプ演算子のすすめ（利点編)](../2024-07-27-r-pipe1)
+- [パイプ演算子のすすめ（種類編)](../2024-07-27-r-pipe2)
+
+:::
+
+現在は主に2つのパイプ演算子が使われている（`|>`と`%>%`）。
+それぞれのパイプ演算子の由来は以下の通り。
+
+- `|>`
+  - R4.1から追加されたパイプ演算子。Rの文法要素として追加され、なにもパッケージを読み込まなくても使用できる。Native pipeとも呼ばれる。
+- `%>%`
+  - `magrittr`パッケージで提供されている。おそらく最初にRでパイプ演算子を導入したもの。
+- `%>>%`
+  - `pipeR`パッケージで提供されている。現在ではあまり使われていないかもしれない。
+
+以降では、`|>`と`%>%`の機能面での違いについて紹介する。
+
+## 実行速度
+
+```{r}
+library(ggplot2)
+library(magrittr)
+
+# ネストさせる用の関数。第一引数をそのまま返す
+f <- function(x) x
+
+# ベンチマーク
+benchmark <- bench::mark(
+  # `%>%`のベンチマーク（1, 5, 10回ネスト）
+  magrittr_nest01 = NULL %>% f(),
+  magrittr_nest05 = NULL %>% f() %>% f() %>% f() %>% f() %>% f(),
+  magrittr_nest10 = NULL %>% f() %>% f() %>% f() %>% f() %>% f() %>% f() %>% f() %>% f() %>% f() %>% f(),
+  
+  # `|>`のベンチマーク（1, 5, 10回ネスト）
+  native_nest01   = NULL |> f(),
+  native_nest05   = NULL |> f() |> f() |> f() |> f() |> f(),
+  native_nest10   = NULL |> f() |> f() |> f() |> f() |> f() |> f() |> f() |> f() |> f() |> f(),
+  
+  # パイプなしのベンチマーク（10回ネスト）
+  no_pipe_nest10  = f(f(f(f(f(f(f(f(f(f(NULL))))))))))
+)
+summary(benchmark)
+```
+
+```{r}
+#| code-fold: true
+#| message: false
+benchmark %>%
+  plot() +
+  scale_x_discrete(limits = rev) +
+  bench::scale_y_bench_time(breaks = c(1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2)) +
+  theme_linedraw()
+```
+
+:::{.callout-tip}
+`|>`の方が高速だが、多くの場合違いを感じられるほどではない。
+`%>%`は回数の多いループの中で沢山使うのは避けたほうがいいかもしれない。
+:::
+
+## Place holder
+
+パイプ演算子はLHSをRHSの第一引数に渡す。
+しかし、第一引数以外に渡したいという場合も考えられる。
+
+```{r}
+#| collapse: true
+# `grepl()`の第二引数に渡すことで、c(TRUE, TRUE, FALSE)にしたい。
+c("apple", "pineapple", "banana") %>% grepl("apple")
+c("apple", "pineapple", "banana") |> grepl("apple")
+```
+
+これはPlace holder（引数の位置を指定できる変数のようなもの）を使うと実現できる。
+Place holderは`%>%`の場合は`.`、`|>`の場合は`_`を使う。
+また、`|>`の場合は`_`を名前付き引数に渡す必要がある。
+
+```{r}
+#| collapse: true
+# place holderは`.`。引数名を指定しなくても良い。
+c("apple", "pineapple", "banana") %>% grepl("apple", .)
+
+# place holderは`_`。引数名を指定しなければいけない。
+c("apple", "pineapple", "banana") |> grepl("apple", x = _)
+```
+
+```{r}
+#| error: true
+#| class-error: txtout-error
+# 引数名を指定しないとエラーになる。
+c("apple", "pineapple", "banana") |> grepl("apple", _)
+```
+
+:::{.callout-tip}
+RHSの第一引数以外にLHSを渡す場合は、place holder (`_`または`.`)を使用する。
+ただし、`|>`の場合（`_`を使う場合）は引数名を指定する必要がある。
+:::
+
+引数名を指定できない場合はどうしたら良いだろうか？
+`%>%`は特に何も考えず、place holderを目的の位置引数に指定できる。
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+# `paste()`関数はいくらでも引数名なしで引数を受け取る。(`...`の部分)
+paste
+
+# `%>%`は問題なく渡せる
+"world" %>% paste("hello", .)
+```
+
+一方で、`|>`は引数名なしではplace holderを使うことはできないのでエラーになる。。
+
+```{r}
+#| error: true
+#| class-error: txtout-error
+# `|>`ではエラーになり実行できない。
+"world" |> paste("hello", _)
+```
+
+このようなとき、`|>`では無名関数を使うことで実現できる。
+しかし、記述が多少煩雑になるため、可読性が低下するかもしれない。
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+# 引数の位置を指定する無名関数を書いて、その無名関数に渡す。
+"world" |> (function(x) paste("hello", x))()
+"world" |> (\(x) paste("hello", x))()
+
+quote( "world" |> (\(x)paste("hello", x))() )
+```
+
+```{r}
+#| code-fold: true
+#| collapse: true
+#| comment: "#>"
+# 実はこの例だと、`|>`でも`x = _`のように適当な引数名をつけることで同じ挙動にできる。
+c("world") |> paste("hello", x = _)
+```
+
+### Place holderの複数回使用
+
+Place holderを複数回使用するなど、少し変わった使い方をする場合に`|>`と`%>%`の柔軟性の違いが大きく現れる。
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+# `%>%`はそのまま複数回使うことができる。
+"Hi!" %>% paste(., .)
+```
+
+```{r}
+#| error: true
+#| class-error: txtout-error
+# `|>`はエラーが出て実行できない。Place holderは一度しか指定することはできない。
+"Hi!" |> paste(x = _, y = _)
+```
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+# 同じことを`|>`でも実現するには無名関数を利用する。
+"Hi!" |> (\(x) paste(x, x))()
+```
+
+:::{.callout-tip}
+`%>%`は複数回place holder(`.`)を使用できる。
+:::
+
+RHSが入れ子になった関数で、内側の関数にLHSを渡したい場合はどうすれば良いだろうか？
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+# 入れ子にする用の関数。第一引数に受け取った文字列を自分の関数名で包んで返す。第二引数以降は無視する。
+outer <- function(x = "", ...) glue::glue("outer({x})")
+inner <- function(x = "", ...) glue::glue("inner({x})")
+
+# RHSが入れ子構造の関数になっている。
+# 内側の関数`inner`にLHSを渡して、"outer(inner(hello))"と出力したいがそうならない。
+"hello" |> outer(inner())
+"hello" %>% outer(inner())
+
+# これは実行されるときに以下のように、`outer`関数の第一引数にLHSが渡されているためである。
+quote("hello" |> outer(inner()))
+```
+
+`%>%`では、RHSを`{`と`}`で囲むことで任意の位置の引数に渡すことができる。
+`|>`では、無名関数を使う必要がある。
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+"hello" %>% {outer(inner(.))}
+"hello" |> (\(x) outer(inner(x)))()
+```
+
+まとめると、`%>%`を使う場合、RHSを`{`と`}`で囲むだけでかなり柔軟にplace holder (`.`)を利用することができる。
+一方で`|>`は制限が強いため、place holder (`_`)を柔軟に利用することは難しい。
+
+:::{.callout-tip}
+`%>%`は入れ子や複数回place holderを使うときには、RHSを`{`と`}`で囲むだけで良い。
+`|>`は、place holderの利用に強い制限があるため、無名関数などを利用する必要がある。
+:::
+
+## 右辺（RHS）の扱い
+
+
+
+# 参考
+
+- [`magrittr` package](https://magrittr.tidyverse.org/index.html)
+- [パイプ演算子自作入門](https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://igjit.github.io/slides/2018/01/tiny_pipe/&ved=2ahUKEwjEuK3rh72HAxUUk68BHVN-AQ0QFnoECC0QAQ&usg=AOvVaw1VcYIba0yEOihJLTPRtEhI)
+- [R 4.1で入ると噂の|>が開発版のRに入ったので触ってみた。](https://notchained.hatenablog.com/entry/2020/12/05/004702)
+- [R 4.1で入るnative pipe（|>）の現状確認](https://notchained.hatenablog.com/entry/2021/04/29/204046)
+- [ R 4.2.0のリリースでにわかに盛り上がる Base Pipe “|>” とは何なのか? %>%との違いを調べました](https://excel2rlang.com/base-pipe-r420/)
+
+# Sessioninfo
+
+```{r}
+sessionInfo()
+```
+
