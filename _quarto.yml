@@ -4,8 +4,18 @@ project:
 website:
   title: "めも"
   navbar:
+    left:
+      - href: about.qmd 
+        text: About
+      - href: index.qmd
+        text: Posts
+      - text: Articles
+        menu:
+          - href: articles/R.qmd
+            text: "R"
+          - href: articles/Quarto.qmd
+            text: "Quarto"
     right:
-      - about.qmd
       - icon: github
         href: https://github.com/t-arae
   google-analytics: "G-543THBE9DB"

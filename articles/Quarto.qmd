@@ -1,0 +1,14 @@
+---
+title: "Quarto関連の記事"
+subtitle: ""
+description: ""
+author: ""
+date: last-modified
+---
+
+
+- [QuartoのTips](../posts/2024-07-22-quarto-tips)
+- [QuartoのTips（R版)](../posts/2024-07-24-quarto-r-coding-tips)
+- [QuartoのTips（Python版)](../posts/2024-07-24-quarto-python-coding-tips)
+- [Quarto shortcodes](../posts/2024-08-08-quarto-shortcode)
+- [Quartoのdivとspan](../posts/2024-08-09-quarto-div-span)
