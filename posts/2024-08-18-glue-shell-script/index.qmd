@@ -1,0 +1,195 @@
+---
+title: "glueパッケージでスクリプトを生成する"
+subtitle: ""
+description: ""
+author: ""
+date: "2024-08-18"
+categories: [R, glue]
+draft: false
+code-annotations: hover
+---
+
+Rの`glue`パッケージを使うと文字列のプレースホルダをRの式を評価した結果に置き換えることができる。
+これを利用して、他の言語のスクリプトで変更したい部分をプレースホルダにして、
+`glue::glue()`で一部分だけ変更したスクリプトを簡単に生成することができる。
+
+# Bash scriptの生成
+
+Rでスクリプト（ここではBash）を生成したい時というのは、
+多くの場合複数のファイルや処理時のパラメータが存在するときである。
+
+Bashスクリプトだけで、多数のファイルに対して同じ処理をするようなスクリプトを記述することも可能だが、
+Rに比べるとBashスクリプトの機能は弱くファイル名や文字列処理が難しいという欠点がある。
+また、文字列操作やファイル名操作、繰り返し処理をBashスクリプトで実装するための文法を追加で覚える労力が必要となる。
+
+RでBashスクリプトを生成するようにすれば、
+ファイルや文字列操作に使い慣れたRの機能やパッケージを利用することができ、
+また覚えるBashスクリプトの文法も最小限ですむという利点がある。
+
+複数のcsvファイルについてBashで何らかの処理を行いたい場合を考えてみよう。
+まずは、csvファイルを用意する。
+Rの`iris`データを`Species`列の値（`"setosa"`, `"versicolor"`, `"virginica"`）で分割し、
+それぞれcsvファイルに書き出す。
+
+```{r}
+library(magrittr)
+
+iris %>%
+  split(.$Species) %>%
+  purrr::iwalk(~ readr::write_csv(.x, glue::glue("{.y}.csv")))
+
+fs::dir_tree(regexp = ".csv$")
+```
+
+csvファイルに書き出すことが出来たので、これらのcsvファイルそれぞれについてBashでデータ処理を行うことを考えよう。
+今回は、`awk`コマンドを使ってそれぞれのcsvファイルについて、
+一列目 `Sepal.Length`と2列目 `Sepal.Width`の平均値を計算して出力するような処理を行う。
+`glue::glue()`を使ってBashスクリプトを生成してみよう。
+ちなみに、シェルスクリプトではバックスラッシュ`\`をよく使う場合があるが、
+その様な時はRのraw stringを使うと良い。
+raw stringは`"なにかの文字列"`のように囲む代わりに、`r"(なにかの文字列)"`の様に囲むことで作成できる。
+
+```{r}
+# 1. scriptの最初の処理を`header`として保存する。
+header <-
+r"(#!/bin/bash
+set -euC
+
+echo "Process started!"
+echo ""
+)"
+# 2. scriptの最後の処理を`footer`として保存する。
+footer <-
+r"(echo "All finished!"
+)"
+# 3. scriptのテンプレートを作成する。プレースホルダ `{label}`の部分を置換する。
+#    `awk`のスクリプト部分で`{}`を使う必要があるので、その部分はエスケープするために二重に囲う
+cmd_template <-
+r"(echo "Processing: '{label}'"
+cat {label}.csv | \
+  awk -F, 'NR > 1 {{
+  sum1 += $1
+  sum2 += $2
+  }} END {{
+   print "Avg. Sepal.Length:", sum1/(NR-1)
+   print "Avg. Sepal.Width :", sum2/(NR-1)
+  }}'
+echo ""
+)"
+
+# 4. 先ほど作成したcsvファイルのファイル名（拡張子以外）を`labels`として、
+#    文字列ベクトルに入れる。
+labels <-
+  fs::dir_ls(regexp = ".csv$") %>%
+  fs::path_file() %>%
+  stringr::str_remove(".csv")
+
+# 5. `label`変数を`labels`の各要素に順番に変更しながら、
+#    `glue::glue()`で`cmd_template`を置換して、
+#    `cmd_temp`ベクトルの要素として追加していく。
+cmd_temp <- character()
+for(label in labels) {
+  cmd_temp <- c(cmd_temp, glue::glue(cmd_template, .trim = FALSE))
+}
+
+# 6. `header`, `cmd_temp`, `footer`を併せて、
+#    スクリプトファイル`temp.sh`に書き込む。
+c(header, cmd_temp, footer) %>% readr::write_lines("temp.sh")
+```
+
+上記のRのコードから出力されたBashスクリプトは以下の様になる。
+
+:::{.my-3 .overflow-y-scroll style="max-height: 300px"}
+```{.bash filename="temp.sh"}
+`r paste(readr::read_lines("temp.sh"), collapse = "\n")`
+```
+:::
+
+このように`glue::glue()`を用いると、
+複数のファイルに対して同じ処理を行う（Bash）スクリプトを手軽に作成することができる。
+
+実際に`temp.sh`を実行してみた結果が以下になる。
+
+```{bash}
+bash temp.sh
+```
+
+# Pythonでは
+
+Pythonであれば、ビルトインの機能であるf-stringや`str.format()`を用いて似た様なことができる。
+
+```{python}
+from pathlib import Path
+
+header = r"""!/bin/bash
+set -euC
+
+echo "Process started!"
+echo ""
+
+"""
+
+footer = r"""echo "All finished!"
+
+"""
+
+cmd_template = r"""echo "Processing: '{label}'"
+cat {label}.csv | \
+  awk -F, 'NR > 1 {{
+  sum1 += $1
+  sum2 += $2
+  }} END {{
+   print "Avg. Sepal.Length:", sum1/(NR-1)
+   print "Avg. Sepal.Width :", sum2/(NR-1)
+  }}'
+echo ""
+
+"""
+
+labels = sorted([f.name[:-4] for f in Path(".").glob("*.csv")])
+
+with open("temp2.sh", mode='w') as f:
+    _ = f.write(header)
+    for label in labels:
+      _ = f.write(cmd_template.format(**{'label': label}))
+    _ = f.write(footer)
+```
+
+:::{.my-3 .overflow-y-scroll style="max-height: 300px"}
+```{.bash filename="temp2.sh"}
+`r paste(readr::read_lines("temp2.sh"), collapse = "\n")`
+```
+:::
+
+```{r}
+#| echo: false
+fs::file_delete(c(
+  "temp.sh",
+  "temp2.sh",
+  "setosa.csv",
+  "versicolor.csv",
+  "virginica.csv"
+))
+```
+
+f-stringは遅延評価できないので、ループの中に直接書くか`str.format()`を用いる。
+
+```{python}
+label = 1
+temp = f"label: {label}"; print(temp)
+label = 2; print(temp)
+```
+
+f-stringはプレースホルダ内に式をかけるが、`str.format()`では使えない。
+
+```{python}
+#| error: true
+f"{label + label}"
+"{label + label}".format(**{"label": label})
+```
+
+# Sessioninfo
+
+```{r}
+sessionInfo()
+```
