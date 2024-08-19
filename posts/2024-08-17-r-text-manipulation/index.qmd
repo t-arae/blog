@@ -1,0 +1,401 @@
+---
+title: "Rでの文字列操作"
+subtitle: ""
+description: ""
+author: ""
+date: "2024-08-17"
+categories: [R, stringr, stringi, glue]
+draft: false
+code-annotations: hover
+---
+
+文字列の操作はデータ処理で頻繁に行われる。
+ここではRにおける文字列操作について紹介する。
+先に最も強調しておきたいところだけ挙げておく。
+
+:::{.callout-important}
+文字列の操作を行う関数は`stringr`パッケージに含まれているので、
+操作が分からないときはパッケージのReferenceを見るか
+Cheat sheetを参照する。
+:::
+
+# 文字列型ベクトル
+
+まずは、Rにおける文字列型のデータについて簡単に説明する。
+Rでよく使われる文字列型のデータは、`character`型の（アトミック）ベクトルである。
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+# ダブルクオーテーションマーク（`"`）かシングルクオーテーションマーク（`'`）で囲むことで文字列型になる
+(s <- "a string type vector") # or 'a string type vector'
+
+class(s) # データ型は`character`
+
+is.atomic(s) # `is.atomic()`がTRUEを返すのでアトミックベクトル。
+
+c(s, s, s) |> str() # 複数の文字列を持つ文字列ベクトル
+
+# `"`か`'`を文字列に含めたい場合は、含めない方のクオーテーションマークを使うか、
+# バックスラッシュ（`\`）でエスケープする
+'a "string"'             
+"a \"string\""
+```
+
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+#| warning: false
+# 他のデータ型から文字列型に変換するときは`as.character()`を使う
+as.character(c(TRUE, FALSE, 2, 3.1, as.factor("four")))
+
+# 数を表す文字列はうまく変換可能な場合は、`as.integer()`と`as.double()`でそれぞれ整数と実数に変換できる
+numbers <- c("1", "-2", "+0", "1.8", "1e3", "1e-02")
+numbers |> as.integer()
+numbers |> as.double()
+
+# 暗黙的なデータ型の変換により、文字列型と他のデータ型を一つのアトミックベクトルにまとめるとすべて文字列型となる
+c("one", TRUE, FALSE, 2, 3.0, as.factor("four"))
+```
+
+# raw string
+
+R4.0から文字列型のデータを作成する新たなリテラルが追加された。
+raw stringと呼ばれるもので、これを利用することでクオーテーション文字（`"`, `'`）や
+バックスラッシュを使ったエスケープ（`\`）を多用する場合に記述をシンプルにすることができる。
+詳しくは以下のページを参照。
+
+- [14.2.2 Raw strings - R for Data Science (2e)](https://r4ds.hadley.nz/strings#sec-raw-strings)
+
+# `stringr`パッケージ
+
+`stringr`パッケージはデータ処理で使うことの多い代表的な文字列操作を行う関数を提供するパッケージで、
+各関数がパイプ演算子との親和性が高いインターフェイス設計になっており、また処理の実行速度も速い。
+
+多くの関数が提供されているのでここでは一部のみ紹介するが、
+何らかの操作をしようとしてどの関数を使えば良いか分からない場合は、
+パッケージのWeb siteの[Reference](https://stringr.tidyverse.org/reference/index.html)を参照するか、
+[Cheat sheet](https://github.com/rstudio/cheatsheets/blob/main/strings.pdf)を参照すると良い。
+
+## 関数のインターフェイスのデザイン
+
+関数のインターフェイスがパイプ演算子との親和性が高くなるように設計されている、とはどういうことだろうか？
+組み込みの文字列操作関数では、処理の対象となる文字列のオブジェクトを第一引数に取らない関数が複数ある。
+パイプ演算子は基本的に左辺の結果を右辺の関数の第一引数に渡すので、連続して文字列操作を行うのなら、
+被操作対象の文字列は第一引数にあった方が都合が良い。
+
+`stringr`パッケージの関数はすべて、関数名が`str_`から始まり、被操作対象となる文字列を第一引数に取るという、
+一貫した設計になっている。
+そのため、パイプ演算子を使用したコーディングと相性が良いと言える。
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+# `stringr`パッケージの`fruit`というオブジェクト。果物の英名の文字列ベクトル。
+fruit <- stringr::fruit
+str(fruit)
+
+# 探索する文字列のパターン
+pat <- "fruit"
+
+# 以下の操作を組み込み関数と、stringrパッケージの関数を使って行う。
+# 1. `fruit`オブジェクトから"fruit"という文字列と一致する要素を抽出して、
+# 2. 抽出した要素について、"fruit"という文字列を”果物"に置換する
+
+# 組み込みの関数。`grep()`も`sub()`も第一引数が被操作対象ではないので、渡す引数を指定する。
+fruit |>
+  grep(pattern = pat, x = _, value = TRUE) |>
+  sub(pat, "果物", x = _)
+
+# stringrパッケージの関数。第一引数が被操作対象なので、パイプ演算子と相性が良い。
+fruit |>
+  stringr::str_subset(pat) |>
+  stringr::str_replace(pat, "果物")
+```
+
+:::{.callout-tip}
+`stringr`の関数は第一引数が操作対象の文字列ベクトルなので、パイプ演算子で処理を次々繋ぎやすい。
+:::
+
+## 正規表現（Regular expression）
+
+`stringr`パッケージの多くの関数が持つ`pattern`という引数は、
+正規表現（Regular expression）という特別な文字列の表現方法を扱うことができる。
+
+正規表現は複数の文字列を一つの文字列で表すためのもので、例えば `"wh(at|en|ere|y|o)"` という文字列は、
+`"what"`, `"when"`, `"where"`, `"why"`, `"who"`の5つの文字列の集合を一つの文字列で表現する正規表現である。
+正規表現で使えるルールはとても多いが、全てを使いこなす必要性はない。
+ごく一部のよく使う表現を覚えておくだけでも、非常に有用なので少しずつ使える表現を増やしていくとよい。
+
+`stringr::str_view()`を使うと、指定した正規表現と一致する文字列が可視化できるので、
+自分が考えた正規表現が正しく対象文字列を指定できるかを確認するのに便利である。
+`stringr::str_view()`を使って、いくつかの正規表現がどの様な部分文字列に一致するか見てみよう。
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+(ten_fruit <- stringr::fruit[1:10])
+
+# メタ文字（Meta Characters）
+stringr::str_view(ten_fruit, "a...")        # "."は任意の1文字を表す（改行文字以外）
+stringr::str_view("100 mL, 28 kg", "\\d+")  # "\\d"は任意の数字を表す。数量詞"+"と組み合わせた。
+stringr::str_view("100 mL, 28 kg", "\\D+")  # "\\D"は任意の非数字を表す。数量詞"+"と組み合わせた。
+
+# グループ化と選択肢（Groups and Alternates）
+stringr::str_view(ten_fruit, "(black)")        # "black"だけのグループ
+stringr::str_view(ten_fruit, "(black|berry)")  # "black"と"berry"どちらかのグループ
+stringr::str_view(ten_fruit, "[le]berry")      # "berry"の直前の文字が"l"または"e"
+stringr::str_view(ten_fruit, "[^le]berry")     # "berry"の直前の文字が"l"または"e"以外
+
+# アンカー (Anchors)。パターンの位置を指定する。
+stringr::str_view(ten_fruit, "^a") # 文字列の最初にある"a"
+stringr::str_view(ten_fruit, "y$") # 文字列の最後にある"y"
+
+# 数量詞（Quantifiers）。何回繰り返すかを指定する。
+stringr::str_view(ten_fruit, "p{2}")   # "p"を2回
+stringr::str_view(ten_fruit, "p{1,2}") # "p"を1-2回
+stringr::str_view(ten_fruit, "p*")     # "p"を0回以上（0回なのでp以外の文字の間も一致）
+stringr::str_view(ten_fruit, "p+")     # "p"を1回以上
+stringr::str_view(ten_fruit, "(na)+")  # "na"を1回以上
+```
+
+:::{.callout-tip}
+正規表現を使うことであるパターンに一致する部分文字列を検出・指定できる。
+:::
+
+```{r}
+AGI <- c(
+    "AT1G01010",              # PATTERNと完全一致
+    "At1g01010",              # tとgが小文字
+    "at1g01010",              # アルファベットがすべて小文字
+    " AT1G01010  ",           # AGIコードの前後にスペースが入っている
+    "AT1G01010, AT1G01010"    # 複数のAGIコードが一つの文字列に含まれている
+  )
+
+PATTERN <- "AT1G01010"
+```
+
+## `stringr`パッケージを使用した文字列の操作
+
+では実際に`stringr`パッケージのいくつかの関数を使用して文字列の操作方法を見てみよう。
+
+今回は、`stringr`パッケージで提供されるさまざまな関数のうち、`pattern`引数を持つ関数を使う。
+`pattern`引数には正規表現を渡すことができるので、
+指定した正規表現について、一致する文字列の有無や一致部分の数・位置を取得したり、
+あるいは一致する文字列について、抽出・削除・別の文字列に置換するなどの操作を行ってみる。
+
+以下では、`stringr`パッケージに付属している`sentences`という短い英文に対して、
+`articles`という冠詞の正規表現を定義して、いくつかの操作を行う。
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+# stringrパッケージの`sentences`の最初の5要素。
+(mini_sentences <- stringr::sentences[1:5])
+
+# 冠詞の正規表現
+articles <- "^(A|An|The)(?= )|(?<= )(a|an|the)(?= )"
+# 正しく一致するか確認
+stringr::str_view(mini_sentences, articles, match = NA)
+```
+
+`articles`によって冠詞に該当する部分文字列を検出できているので、
+定義した正規表現は正しく働くようだ。
+ではこの正規表現を使って実際に文字列を操作をしてみよう。
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+# `pattern`と一致する部分文字列があるかどうか
+mini_sentences |> stringr::str_detect(articles)
+
+# `pattern`と一致する部分文字列の出現回数
+mini_sentences |> stringr::str_count(articles)
+
+# `pattern`と一致する部分文字列の位置
+mini_sentences[1:2] |> stringr::str_locate_all(articles)
+
+# `pattern`と一致する部分文字列の抽出。
+# `stringr::str_extract()`は一致した最初の要素だけ返す。
+# `stringr::str_extract_all()`はすべての一致した要素をリスト形式で返す。
+mini_sentences |> stringr::str_extract(articles)
+
+mini_sentences[1:2] |> stringr::str_extract_all(articles)
+
+# `pattern`と一致する文字列の削除
+mini_sentences[1:2] |> stringr::str_remove_all(articles)
+
+# `pattern`と一致する文字列の置換。
+# 第三引数の`replacement`には単なる文字列の代わりに、文字列を変換する関数を渡すこともできる。
+mini_sentences[1:2] |> stringr::str_replace_all(articles, " ~~~ ")
+
+mini_sentences[1:2] |> stringr::str_replace_all(articles, stringr::str_to_upper)
+```
+
+ちなみに`stringr`パッケージの関数の中には関数名の最後に`str_extract_all()`のように、
+`_all`がついている関数がある。
+`_all`がついている関数はすべての一致する部分文字列に対してなんらかの操作をするが、
+`_all`がついていないバージョンの同名の関数は、最初の一致する部分文字列についてしか操作を行わない。
+
+例えば、`stringr::str_replace_all("aaa", "a", "b")`は
+すべての`"a"`を`"b"`に置換するので`"bbb"`を返すが、
+`stringr::str_replace("aaa", "a", "b")`は最初の一致しか置換しないので`"baa"`を返す。
+
+## Cheat sheet
+
+他のいくつかの`tidyverse`のパッケージと同じく、`stringr`にも[Cheat sheet](https://github.com/rstudio/cheatsheets/blob/main/strings.pdf)がある。
+チートシートの1面には文字列操作の種類ごとにどの関数を使うかが操作の概念図と共に示されており、
+チートシートの2面には正規表現についての情報がまとまっている。
+慣れないうちはPDFを印刷して手近なところに置いておき、都度参照できるようにしておくと便利だと思う。
+
+# `stringi`パッケージ
+
+実は（現在は）`stringr`パッケージは、別の文字列操作のためのパッケージ`stringi`の一部の機能を使いやすくまとめたものになっている。
+ほとんどの文字列操作は`stringr`パッケージで事足りるはずだが、一部の操作は`stringi`パッケージを使う方が楽になることがある。
+例えば、文字列を逆順にする関数は`stringr`パッケージにはないので、`stringi::stri_reverse()`を使うとよい。
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+# `stringr`パッケージを使って無理やりやるとこんな感じになる。できなくはない。
+stringr::str_extract_all("Hello World", ".") |>
+  lapply(rev) |>
+  sapply(stringr::str_flatten)
+
+# `stringi::stri_reverse()`を使えば一つの関数ですむ。
+stringi::stri_reverse("Hello World")
+```
+
+# 組み込みの文字列処理関数（`base`パッケージ）
+
+Rに組み込まれている文字列操作を行う関数もある。
+以下に紹介する関数を使えば、`stringr`パッケージを使わずともある程度の操作が可能になるが、基本的には文字列操作には`stringr`パッケージを使うと覚えておけば良いだろう。
+個人的には、`%in%`, `grepl()`, `tolower()`, `toupper()`, `paste()`, `paste0()`, `sprintf()`などをよく使う。
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+# パターンと一致する要素かどうか、あるいは一致した要素のインデックスを返す
+grepl("berry", ten_fruit)
+grep("berry", ten_fruit)
+
+# 文字列の切り出し
+substr(ten_fruit, 1, 5)
+
+# 文字列置換
+tolower("APPLE")             # すべてを小文字に置換
+toupper("apple")             # すべてを大文字に置換
+sub("berry", "", ten_fruit)  # パターンと一致した最初の文字列を置換
+gsub("berry", "", ten_fruit) # パターンと一致したすべての文字列を置換
+
+# 文字列の結合
+paste("Hello", "World")      # 半角スペースを間に入れて結合
+paste0("Hello", "World")     # そのまま結合
+```
+
+## `%in%`演算子
+
+`%in%`演算子は文字列ベクトルだけのための演算子ではないが、
+文字列の集合について処理を行う時によく使用するので紹介する。
+`%in%`演算子は二項演算子の一つで、左辺の要素と右辺の要素を比較し、
+左辺の各要素について右辺の要素のいずれかと一致するかを調べる。
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+# 左辺の要素と右辺の要素を比較し、左辺の各要素について右辺の要素のいずれかと一致するかを調べる。
+# 正規表現は使えないので完全一致した場合、`TRUE`となる。
+ten_fruit %in% c("apple", "banana")
+
+# 比較できるデータ型は文字列に限らない。
+1:10 %in% c(2, 4, 9)
+
+# 関心のあるデータ集合がデータフレーム中に存在するかを調べるために、
+# `dplyr::filter()`と組み合わせて使うことがよくある。
+iris |>
+  dplyr::filter(Species %in% c("setosa", "versicolor")) |>
+  dplyr::summarise(.by = Species, n = dplyr::n())
+
+# 一致するか調べたい文字列の数が少なければ、正規表現で調べることも不可能ではないが、
+# 多くなると正規表現で調べる方法では非効率になる。
+iris |>
+  dplyr::filter(stringr::str_detect(Species, "setosa|versicolor")) |>
+  dplyr::summarise(.by = Species, n = dplyr::n())
+```
+
+## 数のフォーマット（`sprintf()`関数）
+
+数を特定の形式の文字列にフォーマットしたいときは、`sprintf()`関数を用いる。
+フォーマットできるのは数だけではないが、数を特定の形式にフォーマットする時によく使う。
+詳細は`?sprintf`で見ることができるヘルプを参照すること。
+
+ビルトインの定数`pi`（円周率）を`sprintf()`を使ってフォーマットしてみよう。
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+pi # 円周率
+
+# 実数（正確には浮動小数点数）の書式指定子 `%f`を使って、`pi`をフォーマットする。
+sprintf("π ≈ %f", pi)          # デフォルトの丸め
+sprintf("π ≈ %.2f", pi)        # 少数点以下2桁で丸める
+sprintf("π ≈ %.10f", pi)       # 小数点以下10桁で丸める
+
+# `round()`で丸めてから文字列に変換した結果とおなじ
+paste("π ≈", round(pi, digits = 10))
+```
+
+指数標記にしたり、ゼロ埋めをしたり、左寄せにすることもできる。
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+sprintf("%.2E", 10 ^ seq(0, -6, by = -1))  # 指数標記
+sprintf("%G", 10 ^ seq(0, -6, by = -1))    # 指数-5から指数標記
+
+sprintf("%.04f", c(1, 0.1, 0.01, 0.001))   # 少数部をゼロ埋め
+sprintf("%03d", 1:10)                      #　整数部をゼロ埋め
+
+sprintf("%-10.3f", pi) # 左寄せにして小数点以下３桁まで表示
+```
+
+# 文字列補完（`glue`パッケージ）
+
+Rのオブジェクトの中身や計算結果をもとに、文字列を組み立てられると便利である。
+一例を挙げると、`"Today is {today()}."`という文字列があり、さらに`today()`という関数を実行すると今日の日付が返るとすると、
+この文字列を評価する時に`{today()}`の中括弧の中のコードを実行して、実行結果に置き換えてから文字列を出力するという操作である。
+このような文字列に埋め込まれたプレースホルダを評価して、文字列を組み立てるような操作を一般に、文字列補完や変数展開と呼ぶ。
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+# Sys.Date()は現在の日付を文字列で返す。 
+today <- function() Sys.Date()
+today()
+
+# `paste0()`で文字列を結合するやり方だと、補完したい文字列の数が増えるとコードが見にくくなる。
+paste0("Today is ", today(), ".")
+# `sprintf()`で保管するやり方だと、プレースホルダの代わりに書式指定子を使う必要があり、置換したい内容が分かりにくい。
+sprintf("Today is %s.", today())
+```
+
+`glue`パッケージを使うと、Rでこの文字列補完を行うことができる。
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+# `glue::glue()`関数で文字列を補完する。
+glue::glue("Today is {today()}.")
+glue::glue("Today is {TODAY}.", TODAY = Sys.Date()) # 名前付き引数で参照する。
+```
+
+Pythonのf文字列のような書式指定はそのままではできないが、
+`.transformer`引数に自作の関数を定義して渡すことで
+`glue()`関数の振る舞いを拡張すれば可能となるらしい（[Transformers - glue](https://glue.tidyverse.org/articles/transformers.html)）。
+
+# Sessioninfo
+
+```{r}
+sessionInfo()
+```
