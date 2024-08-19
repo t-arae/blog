@@ -3,6 +3,8 @@ project:
 
 website:
   title: "めも"
+  site-url: 'https://t-arae.blog'
+  site-path: '/'
   navbar:
     left:
       - href: about.qmd 
