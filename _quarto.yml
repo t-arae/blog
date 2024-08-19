@@ -21,6 +21,9 @@ website:
       - icon: github
         href: https://github.com/t-arae
   google-analytics: "G-543THBE9DB"
+  comments:
+    giscus:
+      repo: t-arae/blog
 format:
   html:
     theme:
