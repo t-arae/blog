@@ -4,6 +4,7 @@ subtitle: ""
 description: ""
 author: ""
 date: "2024-07-25"
+date-modified: "2024-08-23"
 categories: [Positron]
 ---
 
@@ -36,4 +37,18 @@ defaults write com.rstudio.positron ApplePressAndHoldEnabled -bool false
 
 Settingsから"rstudio"と検索して、「RStudio > Keymap: Enable」にチェックを入れる。
 
-⌘ + ⇧ + Mで挿入するパイプ演算子は、Settingsで「Positron > R: Pipe」から選択する。
+{{< kbd mac=Command win=Control linus=Control >}} + {{< kbd Shift >}} + {{< kbd M >}} で挿入するパイプ演算子は、Settingsで「Positron > R: Pipe」から選択する。
+
+## 行の折り返し
+
+行を折り返すかどうかは、{{< kbd Alt >}} + {{< kbd Z >}} で切り替えられる。
+ソースペインでもターミナルでも使える。
+
+## Ubuntu 20
+
+PositronをUbuntu 20向けにビルドする際に、`glibc`の互換性の問題があるらしい。
+
+[Positron does not run on Ubuntu 20 (glibc incompatibility) #3854](https://github.com/posit-dev/positron/issues/3854)
+
+そのせいかはわからないが自分のUbuntu 20.04にインストールしたPositronもうまく動作しなかった。
+（コンソールが起動しない。version 2024.08.0-48）
