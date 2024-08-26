@@ -1,0 +1,355 @@
+---
+title: "Rの機能をコピペで便利に使う"
+subtitle: ""
+description: ""
+author: ""
+date: "2024-08-26"
+categories: [clipr, R]
+draft: false
+---
+
+Rで使うことのできる便利な関数をもっと気軽に使いたいと思うことはないだろうか？
+ここでは気軽にRの関数を利用するための便利なパッケージ`clipr`を紹介する。
+
+[`clipr` package - WebSite](https://matthewlincoln.net/clipr/index.html)
+
+`clipr`パッケージを使うと、適当にデータをどこかからコピーしてRの関数に渡し、
+Rの関数で処理した上でまた別のところに貼り付ける、という作業が簡単にできる様になる。
+
+基本的には、Rによるデータ処理はソースファイルにコードを残しておき、
+作業を再現可能にしておくことが望ましい。
+しかし、インターネット上のWebページなどからコピーした文字列をちょっと整形するといった、
+コードとして残すほどではないが手作業でやるには面倒な作業を、
+コンソール上でさくっと終わらせたい時に、`clipr`パッケージは非常に便利である。
+
+# `clipr`パッケージ
+
+コピーアンドペーストを行うときは、OSのclipboardという領域とデータをやり取りする。
+Rの`clipr`パッケージを使うと、このclipboardとRとの間でデータをやり取りすることができる。
+基本的な使用方法は、
+
+1. `clipr::read_clip()`でclipboardからデータをRのオブジェクトとして受け取る
+2. `clipr::write_clip()`にRのオブジェクトを渡し、clipboardに書き込む
+
+のたった2つである。
+
+# `clipr`パッケージの利用例
+## 例１）文章からの遺伝子IDの抽出
+
+実際に`clipr`がどのようなシーンで活用できるか考えてみよう。
+例えば、論文の文章中に以下のような遺伝子のIDがリストアップされているとしよう。
+この文字列から、一つ一つの遺伝子のIDを取り出したいときにどうしたら良いだろうか？
+
+:::{.border .p-2}
+```{r}
+#| echo: false
+#| results: asis
+s <- "In Arabidopsis thaliana, the genes AT2G18790, AT5G10140, AT1G09570, AT1G64280, AT1G66340, AT2G32950, AT4G39400, AT5G03280, AT4G08920, AT4G26080 and AT5G11260 are critical for various physiological processes."
+cat(s)
+Sys.setenv(CLIPR_ALLOW=TRUE)
+clipr::write_clip(s)
+```
+:::
+
+`clipr`パッケージを使えばRで簡単にこれを行うことができる。
+まずは上の文字列をコピーしよう。
+コピーした文字列はclipboardから`clipr::read_clip()`で読みだすことができる。
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+clipr::read_clip()
+```
+
+clipboardから文字列として読み出すことができれば、
+あとは`stringr`パッケージなどのRの文字列処理関数を使って簡単に操作することができる。
+またRにはパイプ演算子があるので、処理を左から右に流れる様に書くことができる。
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+# AGIコードを正規表現で抽出
+clipr::read_clip() |> stringr::str_extract_all("AT.G\\d{5}") |> unlist()
+
+# 第一染色体上の遺伝子のAGIコードを正規表現で抽出
+clipr::read_clip() |> stringr::str_extract_all("AT1G\\d{5}") |> unlist()
+```
+
+以下の様に、表記揺れがある場合はどうしたら良いだろうか？
+各遺伝子IDのアルファベットに大文字と小文字が混ざっていて一貫性がない。
+
+:::{.border .p-2}
+```{r}
+#| echo: false
+#| results: asis
+s <- "AT2G18790, AT5G10140, At1G09570, At1G64280, At1G66340, At2g32950, At4g39400, At5g03280, at4g08920, at4g26080, at5g11260"
+cat(s)
+clipr::write_clip(s)
+```
+:::
+
+このような表記揺れ・ミスは人間が書く以上どうしても防ぎきれないと思うが、
+`stringr`パッケージを使えばこの様な場合にも容易に対処できる。
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+# 前の正規表現だと最初の2つしか抽出できない
+clipr::read_clip() |>
+    stringr::str_extract_all("AT.G\\d{5}") |>
+    unlist()
+
+# 大文字小文字を区別しないような正規表現にする
+clipr::read_clip() |>
+    stringr::str_extract_all("(?i)AT.G\\d{5}") |>
+    unlist()
+
+# いったん全部大文字にしてから抽出
+clipr::read_clip() |>
+    stringr::str_to_upper() |>
+    stringr::str_extract_all("AT.G\\d{5}") |>
+    unlist()
+```
+
+:::{.callout-tip}
+`clipr`パッケージでコピーした文字列からのデータの抽出などの操作が容易に（カジュアルに）行える。
+:::
+
+## 例２）塩基配列の操作
+
+`clipr`パッケージを使うことで、DNA配列などの簡単な操作を行うこともできる。
+以下はある遺伝子の翻訳領域（coding sequence, CDS）のDNA配列を、FASTA形式にしたものである。
+
+```
+>ACT2_AT3G18780.2_CDS
+ATGGCTGAGGCTGATGATATTCAACCAATCGTGTGTGACAATGGTACCGGTATGGTGAAG
+GCTGGATTTGCAGGAGATGATGCTCCCAGGGCTGTTTTTCCCAGTGTTGTTGGTAGGCCA
+AGACATCATGGTGTCATGGTTGGGATGAACCAGAAGGATGCATATGTTGGTGATGAAGCA
+CAATCCAAGAGAGGTATTCTTACCTTGAAGTATCCTATTGAGCATGGTGTTGTTAGCAAC
+TGGGATGATATGGAAAAGATCTGGCATCACACTTTCTACAATGAGCTTCGTATTGCTCCT
+GAAGAGCACCCTGTTCTTCTTACCGAGGCTCCTCTTAACCCAAAGGCCAACAGAGAGAAG
+ATGACTCAAATCATGTTTGAGACCTTTAACTCTCCCGCTATGTATGTCGCCATCCAAGCT
+GTTCTCTCCTTGTACGCCAGTGGTCGTACAACCGGTATTGTGCTGGATTCTGGTGATGGT
+GTGTCTCACACTGTGCCAATCTACGAGGGTTTCTCTCTTCCTCATGCCATCCTCCGTCTT
+GACCTTGCTGGACGTGACCTTACTGATTACCTCATGAAGATCCTTACAGAGAGAGGTTAC
+ATGTTCACCACAACAGCAGAGCGGGAAATTGTAAGAGACATCAAGGAGAAGCTCTCCTTT
+GTTGCTGTTGACTACGAGCAGGAGATGGAAACCTCAAAGACCAGCTCTTCCATCGAGAAG
+AACTATGAATTACCCGATGGGCAAGTCATCACGATTGGTGCTGAGAGATTCAGATGCCCA
+GAAGTCTTGTTCCAGCCCTCGTTTGTGGGAATGGAAGCTGCTGGAATCCACGAGACAACC
+TATAACTCAATCATGAAGTGTGATGTGGATATCAGGAAGGATCTGTACGGTAACATTGTG
+CTCAGTGGTGGAACCACTATGTTCTCAGGTATCGCTGACCGTATGAGCAAAGAAATCACA
+GCACTTGCACCAAGCAGCATGAAGATTAAGGTCGTTGCACCACCTGAAAGGAAGTACAGT
+GTCTGGATCGGTGGTTCCATTCTTGCTTCCCTCAGCACATTCCAGCAGATGTGGATCTCC
+AAGGCCGAGTATGATGAGGCAGGTCCAGGAATCGTTCACAGAAAATGTTTCTAA
+```
+
+```{r}
+#| echo: false
+r"(ATGGCTGAGGCTGATGATATTCAACCAATCGTGTGTGACAATGGTACCGGTATGGTGAAG
+GCTGGATTTGCAGGAGATGATGCTCCCAGGGCTGTTTTTCCCAGTGTTGTTGGTAGGCCA
+AGACATCATGGTGTCATGGTTGGGATGAACCAGAAGGATGCATATGTTGGTGATGAAGCA
+CAATCCAAGAGAGGTATTCTTACCTTGAAGTATCCTATTGAGCATGGTGTTGTTAGCAAC
+TGGGATGATATGGAAAAGATCTGGCATCACACTTTCTACAATGAGCTTCGTATTGCTCCT
+GAAGAGCACCCTGTTCTTCTTACCGAGGCTCCTCTTAACCCAAAGGCCAACAGAGAGAAG
+ATGACTCAAATCATGTTTGAGACCTTTAACTCTCCCGCTATGTATGTCGCCATCCAAGCT
+GTTCTCTCCTTGTACGCCAGTGGTCGTACAACCGGTATTGTGCTGGATTCTGGTGATGGT
+GTGTCTCACACTGTGCCAATCTACGAGGGTTTCTCTCTTCCTCATGCCATCCTCCGTCTT
+GACCTTGCTGGACGTGACCTTACTGATTACCTCATGAAGATCCTTACAGAGAGAGGTTAC
+ATGTTCACCACAACAGCAGAGCGGGAAATTGTAAGAGACATCAAGGAGAAGCTCTCCTTT
+GTTGCTGTTGACTACGAGCAGGAGATGGAAACCTCAAAGACCAGCTCTTCCATCGAGAAG
+AACTATGAATTACCCGATGGGCAAGTCATCACGATTGGTGCTGAGAGATTCAGATGCCCA
+GAAGTCTTGTTCCAGCCCTCGTTTGTGGGAATGGAAGCTGCTGGAATCCACGAGACAACC
+TATAACTCAATCATGAAGTGTGATGTGGATATCAGGAAGGATCTGTACGGTAACATTGTG
+CTCAGTGGTGGAACCACTATGTTCTCAGGTATCGCTGACCGTATGAGCAAAGAAATCACA
+GCACTTGCACCAAGCAGCATGAAGATTAAGGTCGTTGCACCACCTGAAAGGAAGTACAGT
+GTCTGGATCGGTGGTTCCATTCTTGCTTCCCTCAGCACATTCCAGCAGATGTGGATCTCC
+AAGGCCGAGTATGATGAGGCAGGTCCAGGAATCGTTCACAGAAAATGTTTCTAA
+)" |> clipr::write_clip()
+```
+
+このDNA配列部分をマウスで選択してコピーし、`clipr::read_clip()`で読み込むと改行ごとに区切られた文字列ベクトルが得られる。
+
+```{r}
+clipr::read_clip() |>
+    stringr::str_view()
+```
+
+一つの塩基配列にしたいので、以下の様に末端の空白文字を消す処理と、
+文字列を結合して一つにする処理を行うと、目的の文字列データが得られる。
+
+```{r}
+clipr::read_clip() |>
+    stringr::str_squish() |>
+    stringr::str_flatten() |>
+    stringr::str_view()
+```
+
+（ここまで書くならソースコードに書いた方がいいと思うが、）
+一応さくっとCDSに含まれる各コドンの頻度をグラフ化することもできる。
+
+```{r}
+#| code-fold: true
+#| fig-width: !expr "250/25.4"
+#| fig-height: !expr "80/25.4"
+library(ggplot2)
+clipr::read_clip() |>
+    stringr::str_squish() |>
+    stringr::str_flatten() |>
+    stringr::str_extract_all("...") |>
+    unlist() |>
+    tibble::tibble(codon = _) |>
+    dplyr::summarise(.by = codon, count = dplyr::n()) |>
+    dplyr::arrange(desc(count)) |>
+    dplyr::mutate(
+        codon = forcats::fct_inorder(codon),
+        AA = Biostrings::GENETIC_CODE[codon]
+    ) |>
+    ggplot(aes(codon, count)) +
+    geom_col(aes(fill = AA)) +
+    facet_grid(cols = vars(AA), scales = "free_x", space = "free_x") +
+    theme_minimal() +
+    theme(
+       axis.text.x = element_text(angle = 90),
+       panel.grid.minor = element_blank(),
+       panel.grid.major.x = element_blank(),
+       legend.position = "none"
+    ) +
+    scale_y_continuous(expand = expansion(c(0, .1)))
+```
+
+生物学的配列データを取り扱う`Biostrings`パッケージを利用することで、
+コピーしたDNA配列を逆相補鎖にしたり、アミノ酸配列に翻訳したりすることができる。
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+# 文字列を`Biostrings`パッケージを使ってDNA配列として読み込む
+clipr::read_clip() |>
+    stringr::str_squish() |>
+    stringr::str_flatten() |>
+    Biostrings::DNAString() -> cds
+cds
+
+# 逆相補鎖
+cds |> Biostrings::reverseComplement()
+
+# 翻訳
+cds |> Biostrings::translate()
+```
+
+操作したデータは`clipr::write_clip()`でclipboardに書き出し、任意の場所でペーストすることができる。
+
+```{r}
+# CDSをコピーして、その末端のストップコドンを除去してから、翻訳したアミノ酸配列を書き戻す
+clipr::read_clip() |>
+  paste0(collapse = "") |>
+  stringr::str_remove("(TAG|TGA|TAA)$") |>
+  Biostrings::DNAString() |>
+  Biostrings::translate() |>
+  as.character() |>
+  clipr::write_clip()
+```
+
+貼り付けるとこんな感じになる。（見やすさのために40字ごとに折り返した。)
+
+```{r}
+#| echo: false
+clipr::read_clip() |>
+    stringr::str_extract_all(".{1,40}") |>
+    unlist() |>
+    paste(collapse = "\n") |>
+    cat()
+```
+
+## 例３）表の読み込み
+
+`clipr`パッケージでコピーした表を`data.frame`（あるいは`tibble`）として読み込むこともできる。
+以下の様な表があるとする。
+
+```{r}
+#| echo: false
+head(iris) |> knitr::kable(align = "ccccc")
+head(iris) |> clipr::write_clip()
+```
+
+上の表をコピーして、`data.frame`として読み込むには以下の様にすれば良い。
+
+`clipr::read_clip()`で読み込んだ文字列を、改行文字（`\n`）で一つの文字列に結合し、
+`readr::read_tsv()`に渡す。
+
+```{r}
+clipr::read_clip() |>
+    paste(collapse = "\n") |>
+    readr::read_tsv(show_col_types = FALSE)
+```
+
+実は、`clipr::read_clip() |> paste(collapse = "\n")`の部分を一つの関数で行う、
+`readr::clipboard()`という関数もある。
+
+```{r}
+readr::clipboard() |> readr::read_tsv(show_col_types = FALSE)
+```
+
+また、読み込みは`tibble`ではなく`data.frame`になるが一つの関数で表を読み込むことができる、
+`clipr::read_clip_tbl()`という関数もある。
+
+```{r}
+clipr::read_clip_tbl()
+```
+
+Excelなどからコピーしたセルも、上記の手法で`data.frame`として読み込むことができるはずである。
+
+:::{.callout-caution}
+一点、注意すべき点はPDFやウェブサイトにある表はコピーしても、
+これらのようなやり方で簡単に変換できる形式にならない場合が往々にしてあるということである。
+その場合はいったんExcelなどに貼り付けて、地道に手作業で修正する必要がある。
+:::
+
+# `dput()`関数
+
+ここまでは`clipr`パッケージでclipboardから読み込んだデータを、
+書き捨てのコードでデータ処理する例を示してきた。
+一方で、あとで同じような解析をしたいと思って、
+`clipr`パッケージを使ったコードをソースファイルに残しておいても、
+コピーする元のデータがなければコードを残す意味がなくなってしまう。
+つまり、`clipr::read_clip()`で読み込んだデータをあとで使いたい場合は、
+データを再利用可能な形に変換しておく必要がある。
+
+一つのやり方は、データをファイルに書き出す方法である。
+例えば、`data.frame`ならば`csv`ファイルなどに書き出せば良いだろう。
+
+別のやり方として、データを直接Rのコードとしてソースファイルなどに残す方法がある。
+これは`dput()`関数を使うことで達成できる。
+`dput()`にRのオブジェクトを渡すことで、そのRオブジェクトを作るためのコードを表示することができる。
+あとは、表示された文字列をコピーしてソースファイルに貼り付ければ、
+データをコードの形で保存することができる。
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+1:10 |> dput()
+
+LETTERS[1:10] |> dput()
+```
+
+`clipr::read_clip_tbl()`で読み込まれた`data.frame`も`dput()`でコードの形式に変換できる。
+ただし少し見にくい。
+
+```{r}
+#| collapse: true
+#| comment: "#>"
+clipr::read_clip_tbl() |> dput()
+```
+
+# まとめ
+
+`clipr`を使うことで、ソースコードにコードを書かずともコンソールに直接書き捨てのコードを書いて、
+手軽にRの関数などを利用することができる。
+
+上手く活用することで、Rをより便利に使うことができようになると思う。
+
+# Sessioninfo
+
+```{r}
+sessionInfo()
+```
