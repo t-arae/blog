@@ -1,0 +1,11 @@
+ツール名,Python管理,パッケージ管理,パッケージ化,仮想環境,メモ,リンク
+`setuptools`,-,○ (`easy_install`),○,-,NA,NA
+`virtualenv`,-,-,-,○,NA,https://virtualenv.pypa.io/en/latest/
+`venv`,-,-,-,○,NA,https://docs.python.org/ja/3/library/venv.html
+`pip`,-,○,-,-,NA,https://pip.pypa.io/en/stable/#
+`pipenv`,-,○,-,○,NA,NA
+`pyenv`,○,-,-,-,NA,NA
+`conda`,○,○,-,○,NA,NA
+`poetry`,○,○,-,○,NA,NA
+`pdm`,○,○,-,○,NA,NA
+`rye`,○,○,○,○,NA,https://github.com/astral-sh/rye

@@ -4,11 +4,9 @@ subtitle: ""
 description: ""
 author: ""
 date: "2024-02-15"
-categories: [python, venv, rye, pip]
+categories: [Python, venv, rye, pip]
 date-modified: "2024-02-15"
 engine: knitr
-execute: 
-  enabled: false
 ---
 
 # Pythonプロジェクト管理について
@@ -20,41 +18,52 @@ Pythonのプロジェクト管理を行うツールとしてはさまざまな�
 (2024/2/15) ひとまずRyeを使う。わからなくなったらRyeのところだけ見る。
 :::
 
-Pythonプロジェクト/ライブラリをパッケージングするためのエコシステムがあり、
-仮想環境の構築や依存関係を管理する機能が多数開発されてきた。
-解析を行うだけならばパッケージングに関する知識は必要がないが、
-解析環境の管理に、依存関係を管理するツールを使うことができるので、
-学んでおく必要がある。
+これまでにPythonのモジュールをパッケージ化するためのエコシステムと、
+仮想環境の構築や依存関係を管理する手法が多数開発されてきた。
+すこしPythonで解析を行うだけならばこのような知識は必要ないかもしれないが、
+Pythonの解析環境の管理にも依存関係を管理するツールを適用することができれば、
+解析の再現性を保つことができるので学んでおくとよい。
 
 ## パッケージング
 
-ライブラリを配布・インストールするために、PEP-517/518で策定された標準に従った形式で、
-ライブラリをパッケージ化する作業。
+パッケージ化とは、Pythonのコード（モジュール）を配布・インストールするために、
+PEP-517/518で策定された標準に従う形式で、配布可能な状態にまとめる作業。
 ソースコードを配布する「ソースディストリビューション」と、
 ビルド産物を配布する「ビルドディストリビューション」の二つの方式がある。
 作成したディストリビューションはPython Package Index (PyPI)に登録することで公開できる。
 
 ## 依存関係の管理
 
-ライブラリで使用する依存関係の解決。
+パッケージあるいはプロジェクトで使用する他のプログラムについての依存関係の解決を行う。
+一つのコンピューター上に複数のプロジェクトがある場合は、
+仮想環境を作ってプロジェクト間で環境を分離する必要がある。
 
 ## 仮想環境の提供
 
 プロジェクトごとに環境を分離するための仕組みを提供する。
-依存関係にあるライブラリを分離するだけでなく、場合によってはPythonインタプリタ自体も
-管理することができるものもある。
+依存関係にあるライブラリを分離するだけでなく、
+場合によってはPython本体のバージョンも管理することができるものもある。
 
 ## 関連ツールのリスト
 
-* `setuptools`, `easy_install`: パッケージング、ライブラリインストール
-* `virtualenv`, `venv`: 仮想環境
-* `pip`: ライブラリインストール
-* `pipenv`: 仮想環境、ライブラリインストール
-* `pyenv`: インタプリタ管理
-* `conda`: インタプリタ管理、仮想環境、ライブラリインストール (`pip`, `venv`と併用しない)
-* `poetry`: パッケージング、仮想環境、ライブラリインストール
-* `pdm`: パッケージング、仮想環境、ライブラリインストール
-* `rye`: 全て
+```{r}
+#| echo: false
+#| output: asis
+tbl <- readr::read_csv("list.csv", show_col_types = FALSE)
+tbl |>
+  reactable::reactable(
+    columns = list(
+      "ツール名" = reactable::colDef(sticky = "left"),
+      "リンク" = reactable::colDef(html = TRUE, cell = function(value, index) {
+        if(!is.na(value)) {
+          sprintf('<a href="%s">link</a>', value)
+        }
+        })
+      ),
+    wrap = FALSE,
+    pagination = FALSE, defaultColDef = reactable::colDef(width = 200)
+  )
+```
 
 ## 参考
 
@@ -64,7 +73,7 @@ Pythonプロジェクト/ライブラリをパッケージングするための�
   - `poetry`, `pdm`, `rye`についての簡単な解説
 
 # `venv`
-`venv`はPython3の標準ライブラリに入っている、仮想環境を構築・管理するライブラリ。
+`venv`はPython3.3から標準ライブラリに入った仮想環境を構築・管理するモジュール。
 別の仮想環境管理ライブラリ`virtualenv`のサブセットが公式に取り込まれた。
 
 ## 仮想環境の作成
@@ -73,6 +82,7 @@ Pythonプロジェクト/ライブラリをパッケージングするための�
 仮想環境が作成される。
 
 ```{bash}
+#| eval: false
 python3 -m venv .venv
 ```
 
@@ -81,9 +91,10 @@ python3 -m venv .venv
 
 ## 仮想環境への切り替え
 
-作成した仮想環境に切り替えるときには、`.venv/bin/activate`を実行する。
+作成した仮想環境に切り替えるときには、`{仮想環境を保存したディレクトリ}/bin/activate`を実行する。
 
 ```{bash}
+#| eval: false
 . .venv/bin/activate
 ```
 
@@ -96,13 +107,14 @@ python3 -m venv .venv
 
 `venv`が仮想環境を実現する実際の動きは以下のサイトの記事が参考になる。
 
-* [https://endy-tech.hatenablog.jp/entry/how_venv_works_in_python](https://endy-tech.hatenablog.jp/entry/how_venv_works_in_python)
+* [venvが動作する仕組みを調べてみた](https://endy-tech.hatenablog.jp/entry/how_venv_works_in_python)
 
 ## ライブラリのインストール
 
 `pip`を利用した外部ライブラリのインストールは、以下のコマンドで行う。
 
 ```{bash}
+#| eval: false
 python3 -m pip install hogehoge
 ```
 
@@ -111,9 +123,10 @@ python3 -m pip install hogehoge
 
 ## 仮想環境の終了
 
-仮想環境の終了は、仮想環境内で以下の関数を呼び出すことでできる。
+仮想環境を終了するには、仮想環境が有効になっている状態で`deactivate`関数を呼び出す。
 
 ```{bash}
+#| eval: false
 deactivate
 ```
 
@@ -123,6 +136,7 @@ deactivate
 ライブラリ一覧の作成とインストールは、仮想環境内で次のコマンドを実行することでできる。
 
 ```{bash}
+#| eval: false
 # ライブラリ一覧の作成
 python3 -m pip freeze > requirements.txt
 
@@ -140,6 +154,7 @@ Pythonインタプリタから`pip`モジュールを実行したときに、
 まだインストールされていない場合は適切なものをインストールする。
 
 ```{bash}
+#| eval: false
 # モジュールがなくて失敗
 python -m pip install hogehoge
 #> /path/to/.venv/bin/python: No module named pip
@@ -152,6 +167,7 @@ python -m ensurepip
 ## プロジェクト作成
 
 ```{bash}
+#| eval: false
 # プロジェクト作成
 rye init project_name
 
@@ -186,6 +202,7 @@ project_name/
 プロジェクトで依存するモジュールの追加・削除は、`rye`のサブコマンドで行う。
 
 ```{bash}
+#| eval: false
 # 依存の追加
 rye add flask
 rye add "flask>=2.0"
@@ -200,6 +217,7 @@ rye sync
 ## プロジェクトの確認
 
 ```{bash}
+#| eval: false
 rye show
 rye show --installed-deps
 ```
@@ -233,6 +251,7 @@ Pythonプロジェクトのビルド依存関係を指定する方法を規定�
 仮想環境を抜ける時は、環境内で`deactivate`を実行すればよい。
 
 ```{bash}
+#| eval: false
 # 仮想環境の有効化
 rye sync
 . .venv/bin/activate

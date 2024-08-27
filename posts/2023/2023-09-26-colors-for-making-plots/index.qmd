@@ -5,7 +5,6 @@ description: ""
 author: ""
 date: "2023-09-26"
 categories: [color, ggplot2, R]
-date-modified: "2023-09-26"
 ---
 
 まずは以下のリンク先のページの説明を見る。
