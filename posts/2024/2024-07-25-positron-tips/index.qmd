@@ -4,7 +4,7 @@ subtitle: ""
 description: ""
 author: ""
 date: "2024-07-25"
-date-modified: "2024-08-23"
+date-modified: "2024-08-28"
 categories: [Positron]
 ---
 
@@ -43,6 +43,33 @@ Settingsから"rstudio"と検索して、「RStudio > Keymap: Enable」にチェ
 
 行を折り返すかどうかは、{{< kbd Alt >}} + {{< kbd Z >}} で切り替えられる。
 ソースペインでもターミナルでも使える。
+
+## 空白文字の表示
+
+{{< kbd mac=Command win=Ctrl linux=Ctrl >}} + {{< kbd , >}} を押してSettingsを開く。
+検索窓に「whitespace」と入力し、Editor: Render Whitespaceをallにする。
+
+## タブを入力
+
+{{< kbd mac=Command win=Ctrl linux=Ctrl >}} + {{< kbd Shift >}} + {{< kbd P >}} を押して、コマンドパレットを開く。
+「open keyboard」と入力し、Preferences: Open Keyboard Shortcuts (JSON)を選択する。
+`keybindings.json`が開くので、以下を追記する。
+
+```{.json filename="keybindings.json"}
+[
+  {
+    "key": "ctrl+t",
+    "command": "type",
+    "args": { "text": "\t" },
+    "when": "editorTextFocus"
+  }
+  // Other settings
+]
+```
+
+そうするとエディターで {{< kbd Ctrl >}} + {{< kbd T >}} を押すとタブを入力することができる。
+
+参考：[Visual Studio Code でタブを入力する](https://kotsukotsu.work/tech/2020-10-15-visual-studio-code-%E3%81%A7%E3%82%BF%E3%83%96%E3%82%92%E5%85%A5%E5%8A%9B%E3%81%99%E3%82%8B/)
 
 ## Ubuntu 20
 
